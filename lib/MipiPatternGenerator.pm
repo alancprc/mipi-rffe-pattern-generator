@@ -4,9 +4,51 @@ use 5.010001;
 use strict;
 use warnings;
 
+use Moose;
+use Function::Parameters;
+use Types::Standard qw(Str Int ArrayRef RegexpRef);
+use JSON -convert_blessed_universally;
+use Image::ExifTool qw(:Public);
+use File::Basename;
+use File::Spec;
+use File::Path qw(make_path remove_tree);
+use Carp qw(croak carp);
+
+use Exporter qw(import);
+our @EXPORT = qw();
+
 =head1 NAME
 
-MipiPatternGenerator - The great new MipiPatternGenerator!
+MipiPatternGenerator - generate mipi pattern for Unison
+
+=head1 DESCRIPTION
+
+Generate pattern from pattern.txt and registerN.csv file.
+Multiple devices are Supported.
+
+pattern.txt if the pseudo pattern file, contains something like following:
+    ======================================================
+    DUT 1, 2                - required, indicates how many duts
+    labelA:                 - optional
+        GSM_HB_HPM, nop     - register state in registerN.csv 
+        wait 1              - optional, wait 1 cycle
+        TRIG                - optional, trigger pin sets to 1
+        wait 577
+        JMP pa_off          - optional, jump to label pa_off
+    ======================================================
+
+registerN.csv should contain the register table for device. One registerN.csv
+for each device. typically, N = 1 or 2.
+
+Supported Unison pattern micro-instructions:
+   RPT
+   STOP
+   TRIG
+   JMP
+
+Pseudo instructions:
+   wait    -   clock/data stays 0 on this vector for all dut
+   nop     -   no operation for specific dut, clock/data stays all zero
 
 =head1 VERSION
 
@@ -19,19 +61,11 @@ our $VERSION = '0.01';
 
 =head1 SYNOPSIS
 
-Quick summary of what the module does.
-
-Perhaps a little code snippet.
-
     use MipiPatternGenerator;
 
-    my $foo = MipiPatternGenerator->new();
-    ...
-
-=head1 EXPORT
-
-A list of functions that can be exported.  You can delete this section
-if you don't export anything, such as for a purely object-oriented module.
+    my $mipi = MipiPatternGenerator->new();
+    $mipi->setTimeSet($writeTset, $readTset);
+    $mipi->generate("pattern.txt");
 
 =head1 SUBROUTINES/METHODS
 
@@ -105,5 +139,8 @@ This is free software, licensed under:
 
 
 =cut
+
+no Moose;
+__PACKAGE__->meta->make_immutable;
 
 1; # End of MipiPatternGenerator
