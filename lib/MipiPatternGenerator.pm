@@ -63,7 +63,7 @@ our $VERSION = '0.01';
 
 my $tsetWrite = "TS26MHz";
 my $tsetRead  = "TS1MHz";
-my $WR_TIMES = 1; # 256
+my $WR_TIMES  = 1;           # 256
 
 my $pattern_name;
 
@@ -79,8 +79,6 @@ my $WR_count    = 0;
 
 my $uno;
 
-my $debug = 0;
-
 =head1 SYNOPSIS
 
     use MipiPatternGenerator;
@@ -93,7 +91,7 @@ my $debug = 0;
 
 =cut
 
-has 'debug'  => ( is => 'rw', default => 0 );
+has 'debug' => ( is => 'rw', default => 0 );
 
 =head2 generate
 
@@ -101,10 +99,10 @@ has 'debug'  => ( is => 'rw', default => 0 );
 
 =cut
 
-method generate(Str $file)
+method generate (Str $file)
 {
     &validateInputFile($file);
-    my @ins  = &readPseudoPattern($file);
+    my @ins = &readPseudoPattern($file);
 
     open( $uno, ">", "$self->$pattern_name.uno" );
 
@@ -135,7 +133,7 @@ method generate(Str $file)
 
 =cut
 
-method setTimeSet($writeTset, $readTset)
+method setTimeSet ($writeTset, $readTset)
 {
     $tsetWrite = $writeTset;
     $tsetRead  = $readTset;
@@ -291,13 +289,13 @@ fun regWrite ($reg)
         "*$slave_addr[0]10* $tsetWrite;           \"$cycle_count  SA0\"");
 
     printVector(
-"*$write_read[2]10* $tsetWrite;           \"$cycle_count  Write_cmd 2\""
+        "*$write_read[2]10* $tsetWrite;           \"$cycle_count  Write_cmd 2\""
     );
     printVector(
-"*$write_read[1]10* $tsetWrite;           \"$cycle_count  Write_cmd 1\""
+        "*$write_read[1]10* $tsetWrite;           \"$cycle_count  Write_cmd 1\""
     );
     printVector(
-"*$write_read[0]10* $tsetWrite;           \"$cycle_count  Write_cmd 0\""
+        "*$write_read[0]10* $tsetWrite;           \"$cycle_count  Write_cmd 0\""
     );
 
     for ( my $m = 4 ; $m >= 0 ; $m-- ) {
@@ -544,7 +542,7 @@ fun regWriteRead256Bytes ($reg)
             );
         }
         printVector(
-"*$parity[0]10* $tsetWrite;           \"$cycle_count  parity[0]  \""
+            "*$parity[0]10* $tsetWrite;           \"$cycle_count  parity[0]  \""
         );
 
         for ( my $m = 0 ; $m < 8 ; $m++ ) {
@@ -553,7 +551,7 @@ fun regWriteRead256Bytes ($reg)
             );
         }
         printVector(
-"*$parity[1]10* $tsetWrite;           \"$cycle_count  parity[1]  \""
+            "*$parity[1]10* $tsetWrite;           \"$cycle_count  parity[1]  \""
         );
 
         printVector("\*010* $tsetWrite;           \"$cycle_count  BusPark\"");
@@ -584,7 +582,7 @@ fun regWriteRead256Bytes ($reg)
 "*$write_read[1]10* $tsetRead;           \"$cycle_count  Read_cmd 1\""
         );
         printVector(
-"*$read_bit[0]10* $tsetRead;           \"$cycle_count  Read_cmd 0\""
+            "*$read_bit[0]10* $tsetRead;           \"$cycle_count  Read_cmd 0\""
         );
 
         for ( my $m = 4 ; $m >= 0 ; $m-- ) {
@@ -641,18 +639,19 @@ fun printUno (Str $str)
     say $uno $str;
 }
 
-
 =head2 replace01withLH
 
  replace 0/1 to L/H for read data
 
 =cut
-fun replace01withLH ($dataref, $start, $len)
+
+fun replace01withLH (ArrayRef $dataref, Int $start, Int $len)
 {
-    for my $idx ( $start .. $start + $len ) {
+    for my $idx ( $start .. $start + $len - 1 ) {
         $dataref->[$idx] =~ s/0/L/;
         $dataref->[$idx] =~ s/1/H/;
     }
+    say @$dataref;
 }
 
 =head2 getTimeSet
@@ -661,7 +660,7 @@ fun replace01withLH ($dataref, $start, $len)
 
 =cut
 
-fun getTimeSet ($read)
+method getTimeSet (Int $read)
 {
     my $bits = 3 + 23 + $read;
     my @tset = ($tsetWrite) x $bits;
@@ -675,7 +674,7 @@ fun getTimeSet ($read)
 
 =cut
 
-fun getClockArray ($read)
+fun getClockArray (Int $read)
 {
     my $ones  = 23 + $read;
     my $zeros = 3;
@@ -689,7 +688,7 @@ fun getClockArray ($read)
 
 =cut
 
-fun getDataArray (Str $reg, $read)
+fun getDataArray (Str $reg, Int $read)
 {
     my @data = split //, sprintf( "%020b", hex($reg) );
 
@@ -700,7 +699,7 @@ fun getDataArray (Str $reg, $read)
     push @data, oddParity( @data[ 12 .. 19 ] );
 
     # replace data and parity with expected logic if read
-    &replace01withLH( \@data, 12, 8 ) if $read;
+    &replace01withLH( \@data, 12, 9 ) if $read;
 
     # add bus park
     push @data, 0;
@@ -713,8 +712,6 @@ fun getDataArray (Str $reg, $read)
 
     # add parity for cmd
     splice @data, 15, 0, oddParity( @data[ 3 .. 14 ] );
-
-    say "$reg, $read, \n@data\n" if $debug;
 
     return @data;
 }
@@ -826,13 +823,13 @@ fun regRW ( Str $reg, $read)
         "*$slave_addr[0]10* $tsetWrite;           \"$cycle_count  SA0\"");
 
     printVector(
-"*$write_read[2]10* $tsetWrite;           \"$cycle_count  Write_cmd 2\""
+        "*$write_read[2]10* $tsetWrite;           \"$cycle_count  Write_cmd 2\""
     );
     printVector(
-"*$write_read[1]10* $tsetWrite;           \"$cycle_count  Write_cmd 1\""
+        "*$write_read[1]10* $tsetWrite;           \"$cycle_count  Write_cmd 1\""
     );
     printVector(
-"*$write_read[0]10* $tsetWrite;           \"$cycle_count  Write_cmd 0\""
+        "*$write_read[0]10* $tsetWrite;           \"$cycle_count  Write_cmd 0\""
     );
 
     for ( my $m = 4 ; $m >= 0 ; $m-- ) {
@@ -920,4 +917,4 @@ This is free software, licensed under:
 no Moose;
 __PACKAGE__->meta->make_immutable;
 
-1; # End of MipiPatternGenerator
+1;    # End of MipiPatternGenerator
