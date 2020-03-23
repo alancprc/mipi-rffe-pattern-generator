@@ -50,6 +50,16 @@ isa_ok( $mipi, "MipiPatternGenerator" );
     is( join( "", @data ), $exp );
 }
 
+# set/get tset
+{
+    $mipi->setTimeSet("W", "r");
+    my @write = $mipi->getTimeSetArray(0);
+    is ( join("", @write), "W" x 26);
+
+    my @read = $mipi->getTimeSetArray(1);
+    is ( join("", @read), "W" x 17 . "r" x 9 . "W");
+}
+
 done_testing();
 
 diag("Testing MipiPatternGenerator $MipiPatternGenerator::VERSION, Perl $], $^X"

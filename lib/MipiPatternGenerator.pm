@@ -653,17 +653,20 @@ fun replace01withLH (ArrayRef $dataref, Int $start, Int $len)
     say @$dataref;
 }
 
-=head2 getTimeSet
+=head2 getTimeSetArray
 
  return array for timeset
 
 =cut
 
-method getTimeSet (Int $read)
+method getTimeSetArray (Int $read)
 {
     my $bits = 3 + 23 + $read;
     my @tset = ($tsetWrite) x $bits;
-    splice @tset, 17, 9, ($tsetRead) x 9 if $read;
+    #splice @tset, 17, 9, ($tsetRead) x 9 if $read;
+    if ($read) {
+        splice @tset, 17, 9, ($tsetRead) x 9;
+    }
     return @tset;
 }
 
@@ -737,7 +740,7 @@ fun regRW ( Str $reg, $read)
 {
     my @data  = &getDataArray( $reg, $read );
     my @clock = &getClockArray($read);
-    my @tset  = &getTimeSet($read);
+    my @tset  = &getTimeSetArray($read);
 
     my $total20_decimal = hex($reg);
     my $total20_temp    = sprintf( "%016b", $total20_decimal );
