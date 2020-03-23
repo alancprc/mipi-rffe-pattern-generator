@@ -62,7 +62,6 @@ our $VERSION = '0.01';
 
 my $tsetWrite = "TS26MHz";
 my $tsetRead  = "TS1MHz";
-my $WR_TIMES  = 1;           # 256
 
 my $pattern_name;
 
@@ -100,22 +99,22 @@ has 'debug' => ( is => 'rw', default => 0 );
 
 method generate (Str $file)
 {
-    &validateInputFile($file);
+    $self->validateInputFile($file);
     my @ins = &readPseudoPattern($file);
 
-    open( $uno, ">", "$self->$pattern_name.uno" );
+    open( $uno, ">", "$pattern_name.uno" );
 
-    &printHeader;
+    &printHeader();
 
     for (@ins) {
         chomp;
 
         if (/0x(\S+)W$/) {
-            &regWrite($1);
+            $self->regWrite($1);
         } elsif (/0x(\S+)R$/) {
-            &regRead($1);
+            $self->regRead($1);
         } elsif (/0x(\S+)WR256$/) {
-            &regWriteRead256Bytes($1);
+            $self->regWriteRead256Bytes($1);
         } elsif ( !/wait/ and /^\s*(\w+)\s*$/ ) {
 
             # label
@@ -187,7 +186,7 @@ fun printHeader ()
 
 fun readPseudoPattern ($inputfile)
 {
-    open( my $fh, "<", $inputfile );
+    open( my $fh, "<", $inputfile ) or die "$inputfile doesn't exist.";
     my @data = <$fh>;
     close $fh;
 
@@ -200,126 +199,10 @@ fun readPseudoPattern ($inputfile)
 
 =cut
 
-fun regWrite ($reg)
+method regWrite ($reg)
 {
     my $read = 0;
-    return &regRW( $reg, $read );
-
-    my $total20_decimal = hex($reg);
-    my $total20_temp    = sprintf( "%016b", $total20_decimal );
-
-    my @total20_bit_temp = split( //, $total20_temp );
-
-    my $length_total20_temp = @total20_bit_temp;
-    my $total20;
-    if ( $length_total20_temp == 19 ) {
-        $total20 = "0" . $total20_temp;
-    } elsif ( $length_total20_temp == 18 ) {
-        $total20 = "00" . $total20_temp;
-    } elsif ( $length_total20_temp == 17 ) {
-        $total20 = "000" . $total20_temp;
-    } elsif ( $length_total20_temp == 16 ) {
-        $total20 = "0000" . $total20_temp;
-    } else {
-        $total20 = $total20_temp;
-    }
-
-    my @total20_bit    = split( //, $total20 );
-    my $length_total20 = @total20_bit;
-
-    my @write_read;
-    ++$write_count;
-
-    $slave_addr[3] = $total20_bit[0];
-    $slave_addr[2] = $total20_bit[1];
-    $slave_addr[1] = $total20_bit[2];
-    $slave_addr[0] = $total20_bit[3];
-
-    $write_read[2] = 0;
-    $write_read[1] = 1;
-    $write_read[0] = 0;
-
-    # from LSB to MSB
-    for ( my $m = 4 ; $m >= 0 ; $m-- ) {
-        my $j = 11 - $m;
-        $data_addr[$m] = $total20_bit[$j];
-    }
-
-    for ( my $m = 7 ; $m >= 0 ; $m-- ) {
-        my $j = 19 - $m;
-        $data[$m] = $total20_bit[$j];
-    }
-
-    my $sum1 =
-      $slave_addr[3] +
-      $slave_addr[2] +
-      $slave_addr[1] +
-      $slave_addr[0] +
-      $write_read[2] +
-      $write_read[1] +
-      $write_read[0] +
-      $data_addr[4] +
-      $data_addr[3] +
-      $data_addr[2] +
-      $data_addr[1] +
-      $data_addr[0];
-
-    my $sum2 = 0;
-    for ( my $m = 7 ; $m >= 0 ; $m-- ) { $sum2 = $sum2 + $data[$m]; }
-
-    if   ( $sum1 % 2 == 0 ) { $parity[0] = 1 }
-    else                    { $parity[0] = 0 }
-
-    if   ( $sum2 % 2 == 0 ) { $parity[1] = 1 }
-    else                    { $parity[1] = 0 }
-
-    printVector(
-"\*000* $tsetWrite;           \"$cycle_count  START Write $data_addr[4]$data_addr[3]$data_addr[2]$data_addr[1]$data_addr[0]\: $data[7]$data[6]$data[5]$data[4]$data[3]$data[2]$data[1]$data[0]\""
-    );
-    printVector("\*100* $tsetWrite;           \"$cycle_count  \"");
-    printVector("\*000* $tsetWrite;           \"$cycle_count  \"");
-    printVector(
-        "*$slave_addr[3]10* $tsetWrite;           \"$cycle_count  SA3\"");
-    printVector(
-        "*$slave_addr[2]10* $tsetWrite;           \"$cycle_count  SA2\"");
-    printVector(
-        "*$slave_addr[1]10* $tsetWrite;           \"$cycle_count  SA1\"");
-    printVector(
-        "*$slave_addr[0]10* $tsetWrite;           \"$cycle_count  SA0\"");
-
-    printVector(
-        "*$write_read[2]10* $tsetWrite;           \"$cycle_count  Write_cmd 2\""
-    );
-    printVector(
-        "*$write_read[1]10* $tsetWrite;           \"$cycle_count  Write_cmd 1\""
-    );
-    printVector(
-        "*$write_read[0]10* $tsetWrite;           \"$cycle_count  Write_cmd 0\""
-    );
-
-    for ( my $m = 4 ; $m >= 0 ; $m-- ) {
-        printVector(
-"*$data_addr[$m]10* $tsetWrite;           \"$cycle_count  data_Addr Bit Num $m  $_\""
-        );
-    }
-    printVector(
-        "*$parity[0]10* $tsetWrite;           \"$cycle_count  parity[1]  \"");
-
-    for ( my $m = 7 ; $m >= 0 ; $m-- ) {
-        printVector(
-"*$data[$m]10* $tsetWrite;           \"$cycle_count  data Bit Num $m  $_\""
-        );
-    }
-
-    printVector(
-        "*$parity[1]10* $tsetWrite;           \"$cycle_count  parity[2]  \"");
-
-    printVector("\*010* $tsetWrite;           \"$cycle_count  BusPark\"");
-
-    printVector("\*010* $tsetWrite;           \"$cycle_count  STOP\"");
-    printVector("\*010* $tsetWrite;           \"$cycle_count  \"");
-    printVector("\*000* $tsetWrite;           \"$cycle_count  \"");
-    printVector("\*000* $tsetWrite;           \"$cycle_count  \"");
+    return $self->regRW( $reg, $read );
 }
 
 =head2 regRead
@@ -328,129 +211,25 @@ fun regWrite ($reg)
 
 =cut
 
-fun regRead ($reg)
+method regRead ($reg)
 {
     my $read = 1;
-    return &regRW( $reg, $read );
+    return $self->regRW( $reg, $read );
+}
 
-    my $total20_decimal = hex($reg);
-    my $total20_temp    = sprintf( "%016b", $total20_decimal );
+=head2 increaseRegData
 
-    my @total20_bit_temp = split( //, $total20_temp );
+ increase register data only
 
-    my $length_total20_temp = @total20_bit_temp;
-    my $total20;
-    if ( $length_total20_temp == 19 ) {
-        $total20 = "0" . $total20_temp;
-    } elsif ( $length_total20_temp == 18 ) {
-        $total20 = "00" . $total20_temp;
-    } elsif ( $length_total20_temp == 17 ) {
-        $total20 = "000" . $total20_temp;
-    } elsif ( $length_total20_temp == 16 ) {
-        $total20 = "0000" . $total20_temp;
-    } else {
-        $total20 = $total20_temp;
-    }
+=cut
 
-    my @total20_bit    = split( //, $total20 );
-    my $length_total20 = @total20_bit;
-
-    my @write_read;
-    ++$read_count;
-
-    $slave_addr[3] = $total20_bit[0];
-    $slave_addr[2] = $total20_bit[1];
-    $slave_addr[1] = $total20_bit[2];
-    $slave_addr[0] = $total20_bit[3];
-
-    $write_read[2] = 0;
-    $write_read[1] = 1;
-    $write_read[0] = 1;
-
-    # from LSB to MSB
-    for ( my $m = 4 ; $m >= 0 ; $m-- ) {
-        my $j = 11 - $m;
-        $data_addr[$m] = $total20_bit[$j];
-    }
-
-    for ( my $m = 7 ; $m >= 0 ; $m-- ) {
-        my $j = 19 - $m;
-        $data[$m] = $total20_bit[$j];
-    }
-
-    my $sum1 =
-      $slave_addr[3] +
-      $slave_addr[2] +
-      $slave_addr[1] +
-      $slave_addr[0] +
-      $write_read[2] +
-      $write_read[1] +
-      $write_read[0] +
-      $data_addr[4] +
-      $data_addr[3] +
-      $data_addr[2] +
-      $data_addr[1] +
-      $data_addr[0];
-
-    my $sum2 = 0;
-    for ( my $m = 7 ; $m >= 0 ; $m-- ) { $sum2 = $sum2 + $data[$m]; }
-
-    if   ( $sum1 % 2 == 0 ) { $parity[0] = 1 }
-    else                    { $parity[0] = 0 }
-
-    if   ( $sum2 % 2 == 0 ) { $parity[1] = 'H' }
-    else                    { $parity[1] = 'L' }
-
-    printVector(
-"\*000* $tsetRead;           \"$cycle_count  START Read $data_addr[4]$data_addr[3]$data_addr[2]$data_addr[1]$data_addr[0]\: $data[7]$data[6]$data[5]$data[4]$data[3]$data[2]$data[1]$data[0]\""
-    );
-    printVector("\*100* $tsetRead;           \"$cycle_count  \"");
-    printVector("\*000* $tsetRead;           \"$cycle_count  \"");
-    printVector(
-        "*$slave_addr[3]10* $tsetWrite;           \"$cycle_count  SA3\"");
-    printVector(
-        "*$slave_addr[2]10* $tsetWrite;           \"$cycle_count  SA2\"");
-    printVector(
-        "*$slave_addr[1]10* $tsetWrite;           \"$cycle_count  SA1\"");
-    printVector(
-        "*$slave_addr[0]10* $tsetWrite;           \"$cycle_count  SA0\"");
-
-    printVector(
-        "*$write_read[2]10* $tsetWrite;           \"$cycle_count  Read_cmd 2\""
-    );
-    printVector(
-        "*$write_read[1]10* $tsetWrite;           \"$cycle_count  Read_cmd 1\""
-    );
-    printVector(
-        "*$write_read[0]10* $tsetWrite;           \"$cycle_count  Read_cmd 0\""
-    );
-
-    for ( my $m = 4 ; $m >= 0 ; $m-- ) {
-        printVector(
-"*$data_addr[$m]10* $tsetWrite;           \"$cycle_count  data_Addr Bit Num $m  $_\""
-        );
-    }
-    printVector(
-        "*$parity[0]10* $tsetRead;           \"$cycle_count  parity[1]  \"");
-
-    printVector("\*010* $tsetRead;           \"$cycle_count  BusPark\"");
-
-    for ( my $m = 7 ; $m >= 0 ; $m-- ) {
-        $data[$m] = $data[$m] ? "H" : "L";
-        printVector(
-"*$data[$m]10\* $tsetRead;           \"$cycle_count  Data Bit Num: $m  $_\""
-        );
-    }
-
-    printVector(
-        "*$parity[1]10* $tsetRead;           \"$cycle_count  parity[2]  \"");
-
-    printVector("\*010* $tsetWrite;           \"$cycle_count  BusPark\"");
-
-    printVector("\*010* $tsetWrite;           \"$cycle_count  STOP\"");
-    printVector("\*010* $tsetWrite;           \"$cycle_count  \"");
-    printVector("\*000* $tsetWrite;           \"$cycle_count  \"");
-    printVector("\*000* $tsetWrite;           \"$cycle_count  \"");
+fun increaseRegData(Ref $ref)
+{
+    say STDERR $$ref;
+    return 0 if $$ref =~ /FF$/i;
+    my $dec = hex($$ref);
+    ++$dec;
+    $$ref = sprintf("%X", $dec);
 }
 
 =head2 regWriteRead256Bytes
@@ -459,160 +238,24 @@ fun regRead ($reg)
 
 =cut
 
-fun regWriteRead256Bytes ($reg)
+method regWriteRead256Bytes ($reg)
 {
-    my $total12_decimal = hex($1);
-    print "\$1 is $1\n";
-    my $total12        = sprintf( "%012b", $total12_decimal );
-    my @total12_bit    = split( //, $total12 );
-    my $length_total12 = @total12_bit;
-    my @write_read;
-    $WR_count = $WR_count + 1;
-    printUno("\$$1\_WR0_255_T$WR_count");
+    $self->regWrite($reg);
+    $self->regRead($reg);
 
-    $slave_addr[3] = $total12_bit[0];
-    $slave_addr[2] = $total12_bit[1];
-    $slave_addr[1] = $total12_bit[2];
-    $slave_addr[0] = $total12_bit[3];
-    $write_read[2] = 0;
-    $write_read[1] = 1;
-    $write_read[0] = 0;
-    my @read_bit;
-    $read_bit[0] = 1;
-    my @parity_read;
-
-    $data_addr[4] = $total12_bit[7];
-    $data_addr[3] = $total12_bit[8];
-    $data_addr[2] = $total12_bit[9];
-    $data_addr[1] = $total12_bit[10];
-    $data_addr[0] = $total12_bit[11];
-    my $sum1 =
-      $slave_addr[3] +
-      $slave_addr[2] +
-      $slave_addr[1] +
-      $slave_addr[0] +
-      $write_read[2] +
-      $write_read[1] +
-      $write_read[0] +
-      $data_addr[4] +
-      $data_addr[3] +
-      $data_addr[2] +
-      $data_addr[1] +
-      $data_addr[0];
-    if ( $sum1 % 2 == 0 ) { $parity[0] = 1, $parity_read[0] = 0; }
-    else                  { $parity[0] = 0; $parity_read[0] = 1; }
-
-    my $loop_data;
-    for ( $loop_data = 0 ; $loop_data < $WR_TIMES ; $loop_data++ ) {
-
-        my $data8 = sprintf( "%08b", $loop_data );
-        my @data  = split( //, $data8 );
-        my $sum2  = 0;
-        for ( my $m = 7 ; $m >= 0 ; $m-- ) { $sum2 = $sum2 + $data[$m]; }
-        if   ( $sum2 % 2 == 0 ) { $parity[1] = 1 }
-        else                    { $parity[1] = 0 }
-
-        printVector(
-"\*000* $tsetWrite;           \"$cycle_count  START Write $data_addr[4] $data_addr[3]$data_addr[2]$data_addr[1]$data_addr[0]\: $data[0]$data[1]$data[2]$data[3] $data[4]$data[5]$data[6]$data[7]\""
-        );
-        printVector("\*100* $tsetWrite;           \"$cycle_count  \"");
-        printVector("\*000* $tsetWrite;           \"$cycle_count  \"");
-        printVector(
-            "*$slave_addr[3]10* $tsetWrite;           \"$cycle_count  SA3\"");
-        printVector(
-            "*$slave_addr[2]10* $tsetWrite;           \"$cycle_count  SA2\"");
-        printVector(
-            "*$slave_addr[1]10* $tsetWrite;           \"$cycle_count  SA1\"");
-        printVector(
-            "*$slave_addr[0]10* $tsetWrite;           \"$cycle_count  SA0\"");
-        printVector(
-"*$write_read[2]10* $tsetWrite;           \"$cycle_count  Write_cmd 2\""
-        );
-        printVector(
-"*$write_read[1]10* $tsetWrite;           \"$cycle_count  Write_cmd 1\""
-        );
-        printVector(
-"*$write_read[0]10* $tsetWrite;           \"$cycle_count  Write_cmd 0\""
-        );
-
-        for ( my $m = 4 ; $m >= 0 ; $m-- ) {
-            printVector(
-"*$data_addr[$m]10* $tsetWrite;           \"$cycle_count  data_Addr Bit Num $m  $_\""
-            );
-        }
-        printVector(
-            "*$parity[0]10* $tsetWrite;           \"$cycle_count  parity[0]  \""
-        );
-
-        for ( my $m = 0 ; $m < 8 ; $m++ ) {
-            printVector(
-"*$data[$m]10* $tsetWrite;           \"$cycle_count  data Bit Num $m  $_\""
-            );
-        }
-        printVector(
-            "*$parity[1]10* $tsetWrite;           \"$cycle_count  parity[1]  \""
-        );
-
-        printVector("\*010* $tsetWrite;           \"$cycle_count  BusPark\"");
-
-        printVector("\*010* $tsetWrite;           \"$cycle_count  STOP\"");
-        printVector("\*010* $tsetWrite;           \"$cycle_count  \"");
-        printVector("\*100* $tsetWrite;           \"$cycle_count  \"");
-        printVector("\*100* $tsetWrite;           \"$cycle_count  \"");
-
-        ######## end of write #################
-        printVector(
-"\*000* $tsetRead;           \"$cycle_count  START Read $data_addr[4] $data_addr[3]$data_addr[2]$data_addr[1]$data_addr[0]\: $data[0]$data[1]$data[2]$data[3] $data[4]$data[5]$data[6]$data[7]\""
-        );
-        printVector("\*100* $tsetRead;           \"$cycle_count  \"");
-        printVector("\*000* $tsetRead;           \"$cycle_count  \"");
-        printVector(
-            "*$slave_addr[3]10* $tsetRead;           \"$cycle_count  SA3\"");
-        printVector(
-            "*$slave_addr[2]10* $tsetRead;           \"$cycle_count  SA2\"");
-        printVector(
-            "*$slave_addr[1]10* $tsetRead;           \"$cycle_count  SA1\"");
-        printVector(
-            "*$slave_addr[0]10* $tsetRead;           \"$cycle_count  SA0\"");
-        printVector(
-"*$write_read[2]10* $tsetRead;           \"$cycle_count  Read_cmd 2\""
-        );
-        printVector(
-"*$write_read[1]10* $tsetRead;           \"$cycle_count  Read_cmd 1\""
-        );
-        printVector(
-            "*$read_bit[0]10* $tsetRead;           \"$cycle_count  Read_cmd 0\""
-        );
-
-        for ( my $m = 4 ; $m >= 0 ; $m-- ) {
-            printVector(
-"*$data_addr[$m]10* $tsetRead;           \"$cycle_count  data_Addr Bit Num $m  $_\""
-            );
-        }
-        printVector(
-"*$parity_read[0]10* $tsetRead;           \"$cycle_count  parity_read  \""
-        );
-        printVector("\*010* $tsetRead;           \"$cycle_count  BusPark\"");
-
-        for ( my $m = 0 ; $m < 8 ; $m++ ) {
-
-            if ( $data[$m] == 0 ) {
-                printVector(
-"\*L10\* $tsetRead;           \"$cycle_count  Data Bit Num: $m  $_\""
-                );
-            } elsif ( $data[$m] == 1 ) {
-                printVector(
-"\*H10\* $tsetRead;           \"$cycle_count  Data Bit Num: $m  $_\""
-                );
-            }
-        }
-
-        printVector("\*010* $tsetWrite;           \"$cycle_count  STOP\"");
-        printVector("\*010* $tsetWrite;           \"$cycle_count  \"");
-        printVector("\*100* $tsetWrite;           \"$cycle_count  \"");
-        printVector("\*100* $tsetWrite;           \"$cycle_count  \"");
-
+    while ( &increaseRegData( \$reg ) ) {
+        $self->regWrite($reg);
+        $self->regRead($reg);
     }
+}
+
+=head2 printVectors
+
+=cut
+
+fun printVectors (ArrayRef $ref)
+{
+    printVector($_) for @$ref;
 }
 
 =head2 printVector
@@ -663,10 +306,8 @@ method getTimeSetArray (Int $read)
 {
     my $bits = 3 + 23 + $read;
     my @tset = ($tsetWrite) x $bits;
-    #splice @tset, 17, 9, ($tsetRead) x 9 if $read;
-    if ($read) {
-        splice @tset, 17, 9, ($tsetRead) x 9;
-    }
+
+    splice @tset, 17, 9, ($tsetRead) x 9 if $read;
     return @tset;
 }
 
@@ -730,15 +371,15 @@ fun getCommentArray (Int $read, Str $reg="")
           Command2 Command1 Command0
           DataAddr4 DataAddr3 DataAddr2 DataAddr1 DataAddr0 Parity1 BusPark
           Data7 Data6 Data5 Data4 Data3 Data2 Data1 Data0 Parity2 BusPark);
-      } else {
-    @comment = qw( SSC SSC SSC SlaveAddr3 SlaveAddr2 SlaveAddr1 SlaveAddr0
-      Command2 Command1 Command0
-      DataAddr4 DataAddr3 DataAddr2 DataAddr1 DataAddr0 Parity1
-      Data7 Data6 Data5 Data4 Data3 Data2 Data1 Data0 Parity2 BusPark);
-  }
-  $comment[0] .= " $reg" if $reg;
+    } else {
+        @comment = qw( SSC SSC SSC SlaveAddr3 SlaveAddr2 SlaveAddr1 SlaveAddr0
+          Command2 Command1 Command0
+          DataAddr4 DataAddr3 DataAddr2 DataAddr1 DataAddr0 Parity1
+          Data7 Data6 Data5 Data4 Data3 Data2 Data1 Data0 Parity2 BusPark);
+    }
+    $comment[0] .= " $reg" if $reg;
 
-  return @comment;
+    return @comment;
 }
 
 =head2 oddParity
@@ -759,127 +400,32 @@ fun oddParity (@data)
 
 =cut
 
-fun regRW ( Str $reg, $read)
+method regRW ( Str $reg, $read)
 {
-    my @data  = &getDataArray( $reg, $read );
-    my @clock = &getClockArray($read);
-    my @tset  = &getTimeSetArray($read);
+    my @data    = &getDataArray( $reg, $read );
+    my @clock   = &getClockArray($read);
+    my @tset    = $self->getTimeSetArray($read);
+    my @comment = &getCommentArray($read);
 
-    my $total20_decimal = hex($reg);
-    my $total20_temp    = sprintf( "%016b", $total20_decimal );
+    die "size not match" unless $#data == $#clock and $#data == $#tset;
 
-    my @total20_bit_temp = split( //, $total20_temp );
+    # add Read/Write register value to comment
+    my $cmt = $read ? "Read" : "Write";
+    $comment[0] .= " $cmt $reg";
 
-    my $length_total20_temp = @total20_bit_temp;
-    my $total20;
-    if ( $length_total20_temp == 19 ) {
-        $total20 = "0" . $total20_temp;
-    } elsif ( $length_total20_temp == 18 ) {
-        $total20 = "00" . $total20_temp;
-    } elsif ( $length_total20_temp == 17 ) {
-        $total20 = "000" . $total20_temp;
-    } elsif ( $length_total20_temp == 16 ) {
-        $total20 = "0000" . $total20_temp;
-    } else {
-        $total20 = $total20_temp;
+    my @vec;
+    for my $i ( 0 .. $#data ) {
+        my $vec = '*';
+        $vec .= $data[$i];
+        $vec .= $clock[$i];
+        $vec .= "0";
+        $vec .= '* ';
+        $vec .= $tset[$i];
+        $vec .= '; ';
+        $vec .= "\"$comment[$i]\"";
+        push @vec, $vec;
     }
-
-    my @total20_bit    = split( //, $total20 );
-    my $length_total20 = @total20_bit;
-
-    my @write_read;
-    ++$write_count;
-
-    $slave_addr[3] = $total20_bit[0];
-    $slave_addr[2] = $total20_bit[1];
-    $slave_addr[1] = $total20_bit[2];
-    $slave_addr[0] = $total20_bit[3];
-
-    $write_read[2] = 0;
-    $write_read[1] = 1;
-    $write_read[0] = 0;
-
-    # from LSB to MSB
-    for ( my $m = 4 ; $m >= 0 ; $m-- ) {
-        my $j = 11 - $m;
-        $data_addr[$m] = $total20_bit[$j];
-    }
-
-    for ( my $m = 7 ; $m >= 0 ; $m-- ) {
-        my $j = 19 - $m;
-        $data[$m] = $total20_bit[$j];
-    }
-
-    my $sum1 =
-      $slave_addr[3] +
-      $slave_addr[2] +
-      $slave_addr[1] +
-      $slave_addr[0] +
-      $write_read[2] +
-      $write_read[1] +
-      $write_read[0] +
-      $data_addr[4] +
-      $data_addr[3] +
-      $data_addr[2] +
-      $data_addr[1] +
-      $data_addr[0];
-
-    my $sum2 = 0;
-    for ( my $m = 7 ; $m >= 0 ; $m-- ) { $sum2 = $sum2 + $data[$m]; }
-
-    if   ( $sum1 % 2 == 0 ) { $parity[0] = 1 }
-    else                    { $parity[0] = 0 }
-
-    if   ( $sum2 % 2 == 0 ) { $parity[1] = 1 }
-    else                    { $parity[1] = 0 }
-
-    printVector(
-"\*000* $tsetWrite;           \"$cycle_count  START Write $data_addr[4]$data_addr[3]$data_addr[2]$data_addr[1]$data_addr[0]\: $data[7]$data[6]$data[5]$data[4]$data[3]$data[2]$data[1]$data[0]\""
-    );
-    printVector("\*100* $tsetWrite;           \"$cycle_count  \"");
-    printVector("\*000* $tsetWrite;           \"$cycle_count  \"");
-    printVector(
-        "*$slave_addr[3]10* $tsetWrite;           \"$cycle_count  SA3\"");
-    printVector(
-        "*$slave_addr[2]10* $tsetWrite;           \"$cycle_count  SA2\"");
-    printVector(
-        "*$slave_addr[1]10* $tsetWrite;           \"$cycle_count  SA1\"");
-    printVector(
-        "*$slave_addr[0]10* $tsetWrite;           \"$cycle_count  SA0\"");
-
-    printVector(
-        "*$write_read[2]10* $tsetWrite;           \"$cycle_count  Write_cmd 2\""
-    );
-    printVector(
-        "*$write_read[1]10* $tsetWrite;           \"$cycle_count  Write_cmd 1\""
-    );
-    printVector(
-        "*$write_read[0]10* $tsetWrite;           \"$cycle_count  Write_cmd 0\""
-    );
-
-    for ( my $m = 4 ; $m >= 0 ; $m-- ) {
-        printVector(
-"*$data_addr[$m]10* $tsetWrite;           \"$cycle_count  data_Addr Bit Num $m  $_\""
-        );
-    }
-    printVector(
-        "*$parity[0]10* $tsetWrite;           \"$cycle_count  parity[1]  \"");
-
-    for ( my $m = 7 ; $m >= 0 ; $m-- ) {
-        printVector(
-"*$data[$m]10* $tsetWrite;           \"$cycle_count  data Bit Num $m  $_\""
-        );
-    }
-
-    printVector(
-        "*$parity[1]10* $tsetWrite;           \"$cycle_count  parity[2]  \"");
-
-    printVector("\*010* $tsetWrite;           \"$cycle_count  BusPark\"");
-
-    printVector("\*010* $tsetWrite;           \"$cycle_count  STOP\"");
-    printVector("\*010* $tsetWrite;           \"$cycle_count  \"");
-    printVector("\*000* $tsetWrite;           \"$cycle_count  \"");
-    printVector("\*000* $tsetWrite;           \"$cycle_count  \"");
+    &printVectors( \@vec );
 }
 
 =head1 AUTHOR
