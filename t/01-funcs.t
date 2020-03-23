@@ -60,7 +60,28 @@ isa_ok( $mipi, "MipiPatternGenerator" );
     is ( join("", @read), "W" x 17 . "r" x 9 . "W");
 }
 
+# get comment
+{
+## Please see file perltidy.ERR
+    my @write = MipiPatternGenerator::getCommentArray(0);
+    my @exp =
+      qw( SSC SSC SSC SlaveAddr3 SlaveAddr2 SlaveAddr1 SlaveAddr0
+      Command2 Command1 Command0
+      DataAddr4 DataAddr3 DataAddr2 DataAddr1 DataAddr0 Parity1
+      Data7 Data6 Data5 Data4 Data3 Data2 Data1 Data0 Parity2 BusPark);
+    is( join( "", @write ), join( "", @exp ) );
+
+        my @read = MipiPatternGenerator::getCommentArray(1);
+        @exp =
+          qw( SSC SSC SSC SlaveAddr3 SlaveAddr2 SlaveAddr1 SlaveAddr0
+          Command2 Command1 Command0
+          DataAddr4 DataAddr3 DataAddr2 DataAddr1 DataAddr0 Parity1 BusPark
+          Data7 Data6 Data5 Data4 Data3 Data2 Data1 Data0 Parity2 BusPark);
+        is( join( "", @read ), join( "", @exp ) );
+}
+
 done_testing();
 
 diag("Testing MipiPatternGenerator $MipiPatternGenerator::VERSION, Perl $], $^X"
 );
+

@@ -718,6 +718,29 @@ fun getDataArray (Str $reg, Int $read)
     return @data;
 }
 
+=head2 getCommentArray
+
+=cut
+
+fun getCommentArray (Int $read, Str $reg="")
+{
+    my @comment;
+    if ($read) {
+        @comment = qw( SSC SSC SSC SlaveAddr3 SlaveAddr2 SlaveAddr1 SlaveAddr0
+          Command2 Command1 Command0
+          DataAddr4 DataAddr3 DataAddr2 DataAddr1 DataAddr0 Parity1 BusPark
+          Data7 Data6 Data5 Data4 Data3 Data2 Data1 Data0 Parity2 BusPark);
+      } else {
+    @comment = qw( SSC SSC SSC SlaveAddr3 SlaveAddr2 SlaveAddr1 SlaveAddr0
+      Command2 Command1 Command0
+      DataAddr4 DataAddr3 DataAddr2 DataAddr1 DataAddr0 Parity1
+      Data7 Data6 Data5 Data4 Data3 Data2 Data1 Data0 Parity2 BusPark);
+  }
+  $comment[0] .= " $reg" if $reg;
+
+  return @comment;
+}
+
 =head2 oddParity
 
  calculate odd parity bit for given array
