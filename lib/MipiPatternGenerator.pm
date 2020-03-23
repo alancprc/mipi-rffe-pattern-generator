@@ -8,7 +8,6 @@ use Moose;
 use Function::Parameters;
 use Types::Standard qw(Str Int ArrayRef RegexpRef Ref);
 use JSON -convert_blessed_universally;
-use Image::ExifTool qw(:Public);
 use File::Basename;
 use File::Spec;
 use File::Path qw(make_path remove_tree);
