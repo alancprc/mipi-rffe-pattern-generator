@@ -102,13 +102,11 @@ method generate (Str $file)
     $self->validateInputFile($file);
     my @ins = &readPseudoPattern($file);
 
-    open( $uno, ">", "$pattern_name.uno" );
+    &openUnoFile($file);
 
-    &printHeader();
+    &printHeader($file);
 
     for (@ins) {
-        chomp;
-
         if (/0x(\S+)W$/) {
             $self->regWrite($1);
         } elsif (/0x(\S+)R$/) {
@@ -152,21 +150,46 @@ method validateInputFile (Str $file)
     $pattern_name =~ s/(\S+)\.\S+/$1/;
 }
 
+=head2 openUnoFile
+
+=cut
+
+fun openUnoFile($file)
+{
+    my $fn = $file;
+    $fn =~ s/(.*)\.\w+/$1.uno/;
+
+    open( $uno, ">", $fn );
+}
+
+=head2 getPatternName
+
+=cut
+
+fun getPatternName($file)
+{
+    my $fn = basename($file);
+    $fn =~ s/(.*)\.\w+/$1/;
+    return $fn;
+}
+
 =head2 printHeader()
 
  print header for unison pattern file.
 
 =cut
 
-fun printHeader ()
+fun printHeader ($file)
 {
-    print $uno "Unison:SyntaxRevision6.310000;\n";
-    print $uno "Pattern  $pattern_name  {\n";
-    print $uno "Mode MixedSignal;\n";
-    print $uno "AliasMap \"DefaultAliasMap\";\n";
-    print $uno "Type Generic;\n\n";
+    my $patternName = &getPatternName($file);
 
-    print $uno "PinList = \"DATA_pin+CLK_pin+FX_TRIGGER_pin\";\n\n";
+    &printUno("Unison:SyntaxRevision6.310000;");
+    &printUno("Pattern $patternName {");
+    &printUno("Mode MixedSignal;");
+    &printUno("AliasMap \"DefaultAliasMap\";");
+    &printUno("Type Generic;\n");
+
+    &printUno("PinList = \"DATA_pin+CLK_pin+FX_TRIGGER_pin\";\n");
 
     #print $uno "CaptureRef MipiCapture = \"DATA_pin\";\n";
     #print $uno "RegSendRef MipiSend = \"DATA_pin+FX_TRIGGER_pin\";\n";
@@ -189,6 +212,8 @@ fun readPseudoPattern ($inputfile)
     open( my $fh, "<", $inputfile ) or die "$inputfile doesn't exist.";
     my @data = <$fh>;
     close $fh;
+
+    chomp @data;
 
     return @data;
 }
