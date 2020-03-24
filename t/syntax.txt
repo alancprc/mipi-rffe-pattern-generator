@@ -6,7 +6,7 @@ ExtraPinName: vramp=0,dummy=1
 
 labelA:
     STATE
-    wait 1
+    wait 
     trig
     wait 577
     jmp pa_off

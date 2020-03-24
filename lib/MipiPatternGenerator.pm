@@ -567,7 +567,7 @@ method BUILD ($var)
 
 =cut
 
-method gen(Str $file)
+method gen (Str $file)
 {
     &validateInputFile($file);
     my @ins = $self->parsePseudoPattern($file);
@@ -576,7 +576,7 @@ method gen(Str $file)
 
     $self->printHeader($file);
 
-    $self->writeVectors(\@ins);
+    $self->writeVectors( \@ins );
 
     &closeUnoFile();
 }
@@ -588,32 +588,52 @@ method gen(Str $file)
 method writeVectors (ArrayRef $ref)
 {
     for (@$ref) {
-        if (/(\w+):/) {
-            &printUno("\$$1");    # label
-        } elsif (/wait\s+(\d+)/i) {
-            &printUno("wait $1 cycles");    # wait
+        if (/(\w+):/) {    # label
+            &printUno("\$$1");
+        } elsif (/wait\s*(\d+)*/i) {
+            my $ins = $1 ? "<RPT $1>" : "";
+            $self->printDataInsComment( $self->getIdleVectorData, $ins,
+                "wait" );
         } elsif (/stop/i) {
-            &printUno("stop");              # stop
+            $self->printDataInsComment( $self->getIdleVectorData, "<STOP>",
+                "stop" );
         } elsif (/jmp\s+(\w+)/i) {
-            &printUno("jmp to $1");         # jmp
+            $self->printDataInsComment( $self->getIdleVectorData, "<JMP $1>",
+                "jump" );
         } elsif (/trig/i) {
-            &printUno("trigger");           # trigger
+            $self->printDataInsComment( $self->getIdleVectorData(1),
+                "<TRIG>", "trigger" );
         } elsif (/(\w+)/) {
-            &printUno("state: $1");     # read/write
+            &printUno("state: $1");    # read/write
             $self->getVectorData($1);
         }
     }
+}
+
+=head2 printDataInsComment
+
+=cut
+
+method printDataInsComment (Str $data, Str $ins, Str $cmt, Str $tset = $tsetWrite)
+{
+    my $str = join( '', '*', $data, '* ', $tset, '; ', $ins );
+    my $num = $self->getPinList() + 30;
+    $str = sprintf( "%-${num}s", $str );
+    $str .= ' "' . $cmt . '"';
+
+    #&printUno(join('', '*', $data, '* ', $tset, '; ', $ins, ' "', $cmt, '"'));
+    &printUno($str);
 }
 
 =head2 getVectorData
 
 =cut
 
-method getVectorData(Str $reg)
+method getVectorData (Str $reg)
 {
     $reg =~ s/\s+//g;
     my @reg = split /,/, $reg;
-    while (@reg < $self->dutNum) {
+    while ( @reg < $self->dutNum ) {
         push @reg, "nop";
     }
     printUno("@reg");
@@ -623,7 +643,7 @@ method getVectorData(Str $reg)
 
 =cut
 
-method getIdleVectorData($trigger)
+method getIdleVectorData ($trigger=0)
 {
     my $vec;
     $vec .= "00" x $self->dutNum;
@@ -643,7 +663,7 @@ method getIdleVectorData($trigger)
 
 =cut
 
-method parsePseudoPattern($file)
+method parsePseudoPattern ($file)
 {
     open( my $fh, "<", $file ) or die "$file doesn't exist.";
     my @data = <$fh>;
@@ -655,7 +675,7 @@ method parsePseudoPattern($file)
     # dut number
     my $line = shift @data;
     die unless $line =~ /^DUT:/;
-    $self->dutNum(scalar split /,/, $line);
+    $self->dutNum( scalar split /,/, $line );
 
     # clock
     $line = shift @data;
@@ -691,8 +711,8 @@ method parsePseudoPattern($file)
     $line =~ s/.*://g;
     my @extra = split /,/, $line;
     for (@extra) {
-        my ($pin, $value) = split /=/;
-        $self->addExtraPin($pin, $value);
+        my ( $pin, $value ) = split /=/;
+        $self->addExtraPin( $pin, $value );
     }
     return @data;
 }
