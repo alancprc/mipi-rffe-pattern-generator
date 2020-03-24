@@ -17,19 +17,25 @@ $mipi->generate("t/sample.txt");
 my $file = 0;
 $file = 1 if -e "t/sample.uno";
 
-ok($file, "sample.uno generated");
+ok( $file, "sample.uno generated" );
 
 open my $fh, "<", "t/sample.uno";
 my @content = <$fh>;
 close $fh;
 
-my @pat = grep /^Pattern\s/, @content;
+my @name = grep /^Pattern\s/, @content;
 
-ok(@pat, "Pattern line");
+ok( @name, "Pattern line" );
 
-$pat[0] =~ m/^Pattern\s+(\S+)/;
+$name[0] =~ m/^Pattern\s+(\S+)/;
 
 is( $1, "sample", "pattern name" );
+
+my $vector = grep /^\s*\*(\s*\w\s*)+\*(\s*\w\s*)+;/, @content;
+ok( $vector > 25, "vector test" );
+
+my $end = grep /^\s*}/, @content;
+ok( $end == 1, "pattern end" );
 
 done_testing();
 
