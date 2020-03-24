@@ -89,7 +89,8 @@ my $uno;
 
 =cut
 
-has 'debug' => ( is => 'rw', default => 0 );
+has 'debug'  => ( is => 'rw', default => 0 );
+has 'dutNum' => ( is => 'rw', default => 1 );
 
 =head2 generate
 
@@ -558,6 +559,142 @@ method getPinList ()
 method BUILD ($var)
 {
     $self->setPinName( "CLK_pin", "DATA_pin" );
+}
+
+=head2 gen
+
+ generate Unison pattern file from pseudo directive with new syntax.
+
+=cut
+
+method gen(Str $file)
+{
+    &validateInputFile($file);
+    my @ins = $self->parsePseudoPattern($file);
+
+    &openUnoFile($file);
+
+    $self->printHeader($file);
+
+    $self->writeVectors(\@ins);
+
+    &closeUnoFile();
+}
+
+=head2 writeVectors
+
+=cut
+
+method writeVectors (ArrayRef $ref)
+{
+    for (@$ref) {
+        if (/(\w+):/) {
+            &printUno("\$$1");    # label
+        } elsif (/wait\s+(\d+)/i) {
+            &printUno("wait $1 cycles");    # wait
+        } elsif (/stop/i) {
+            &printUno("stop");              # stop
+        } elsif (/jmp\s+(\w+)/i) {
+            &printUno("jmp to $1");         # jmp
+        } elsif (/trig/i) {
+            &printUno("trigger");           # trigger
+        } elsif (/(\w+)/) {
+            &printUno("state: $1");     # read/write
+            $self->getVectorData($1);
+        }
+    }
+}
+
+=head2 getVectorData
+
+=cut
+
+method getVectorData(Str $reg)
+{
+    $reg =~ s/\s+//g;
+    my @reg = split /,/, $reg;
+    while (@reg < $self->dutNum) {
+        push @reg, "nop";
+    }
+    printUno("@reg");
+}
+
+=head2 getIdleVectorData
+
+=cut
+
+method getIdleVectorData($trigger)
+{
+    my $vec;
+    $vec .= "00" x $self->dutNum;
+    $vec .= $trigger ? "1" : "0" if $self->getTriggerPin();
+
+    for my $ref ( @{ $self->{'pin'} } ) {
+        $vec .= $ref->{'data'};
+    }
+
+    return $vec;
+}
+
+=head2 parsePseudoPattern
+
+ read pseudo pattern file, translate states to register read/write operation by
+ lookup the register table
+
+=cut
+
+method parsePseudoPattern($file)
+{
+    open( my $fh, "<", $file ) or die "$file doesn't exist.";
+    my @data = <$fh>;
+    close $fh;
+
+    chomp @data;
+    die "$file is empty!" unless @data;
+
+    # dut number
+    my $line = shift @data;
+    die unless $line =~ /^DUT:/;
+    $self->dutNum(scalar split /,/, $line);
+
+    # clock
+    $line = shift @data;
+    die unless $line =~ /^ClockPinName:/;
+    $line =~ s/\s//g;
+    $line =~ s/.*://g;
+    my @clockpins = split /,/, $line;
+
+    # data
+    $line = shift @data;
+    die unless $line =~ /^DataPinName:/;
+    $line =~ s/\s//g;
+    $line =~ s/.*://g;
+    my @datapins = split /,/, $line;
+
+    die "clock/data pin number not match!" unless @clockpins == @datapins;
+    for my $i ( 0 .. @clockpins - 1 ) {
+        $self->setPinName( $clockpins[$i], $datapins[$i], $i + 1 );
+    }
+
+    # trigger
+    $line = shift @data;
+    die unless $line =~ /^TriggerPinName:/;
+    $line =~ s/\s//g;
+    $line =~ s/.*://g;
+    my $trigger = $line;
+    $self->addTriggerPin($trigger) unless $trigger eq "None";
+
+    # extra
+    $line = shift @data;
+    die unless $line =~ /^ExtraPinName:/;
+    $line =~ s/\s//g;
+    $line =~ s/.*://g;
+    my @extra = split /,/, $line;
+    for (@extra) {
+        my ($pin, $value) = split /=/;
+        $self->addExtraPin($pin, $value);
+    }
+    return @data;
 }
 
 =head1 AUTHOR

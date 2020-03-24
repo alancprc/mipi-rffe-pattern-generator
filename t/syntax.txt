@@ -1,0 +1,13 @@
+DUT: 1, 2
+ClockPinName: clk1, clk2
+DataPinName: data1, data2
+TriggerPinName: fx_trigger
+ExtraPinName: vramp=0,dummy=1
+
+labelA:
+    STATE
+    wait 1
+    trig
+    wait 577
+    jmp pa_off
+    stop
