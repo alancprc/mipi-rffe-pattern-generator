@@ -506,7 +506,7 @@ method getTriggerPin ()
 
 method addExtraPin (Str $name, Str $data)
 {
-    $self->{'pin'}->{$name} = $data;
+    push @{ $self->{'pin'} }, { name => $name, data => $data };
 }
 
 =head2 getExtraPins
@@ -515,7 +515,11 @@ method addExtraPin (Str $name, Str $data)
 
 method getExtraPins ()
 {
-    return sort keys %{ $self->{'pin'} };
+    my @pin;
+    for my $ref ( @{ $self->{'pin'} } ) {
+        push @pin, $ref->{'name'};
+    }
+    return @pin;
 }
 
 =head2 getDutNum
