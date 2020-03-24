@@ -119,8 +119,8 @@ method generate (Str $file)
             printUno("\$$1");
         }
     }
-    printUno("}");
-    close $uno;
+
+    &closeUnoFile();
 }
 
 =head2 setTimeSet
@@ -160,6 +160,16 @@ fun openUnoFile($file)
     $fn =~ s/(.*)\.\w+/$1.uno/;
 
     open( $uno, ">", $fn );
+}
+
+=head2 closeUnoFile
+
+=cut
+
+fun closeUnoFile()
+{
+    printUno("}");
+    close $uno;
 }
 
 =head2 getPatternName
