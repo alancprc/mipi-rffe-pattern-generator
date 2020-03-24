@@ -442,8 +442,8 @@ method regRW ( Str $reg, $read)
     die "size not match" unless $#data == $#clock and $#data == $#tset;
 
     # add Read/Write register value to comment
-    my $cmt = $read ? "Read" : "Write";
-    $comment[0] .= " $cmt $reg";
+    my $cmt = $read ? "read" : "write";
+    $comment[0] .= " Start to $cmt $reg";
 
     my @vec;
     for my $i ( 0 .. $#data ) {
