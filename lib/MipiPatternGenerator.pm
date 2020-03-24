@@ -225,7 +225,6 @@ method regRead ($reg)
 
 fun increaseRegData(Ref $ref)
 {
-    say STDERR $$ref;
     return 0 if $$ref =~ /FF$/i;
     my $dec = hex($$ref);
     ++$dec;
