@@ -99,12 +99,12 @@ has 'debug' => ( is => 'rw', default => 0 );
 
 method generate (Str $file)
 {
-    $self->validateInputFile($file);
+    &validateInputFile($file);
     my @ins = &readPseudoPattern($file);
 
     &openUnoFile($file);
 
-    &printHeader($file);
+    $self->printHeader($file);
 
     for (@ins) {
         if (/0x(\S+)W$/) {
@@ -141,20 +141,17 @@ method setTimeSet ($writeTset, $readTset)
 
 =cut
 
-method validateInputFile (Str $file)
+fun validateInputFile (Str $file)
 {
     die "invalid suffix '.uno', please rename the suffix and try again"
       if $file =~ /.*\.uno$/;
-
-    $pattern_name = $file;
-    $pattern_name =~ s/(\S+)\.\S+/$1/;
 }
 
 =head2 openUnoFile
 
 =cut
 
-fun openUnoFile($file)
+fun openUnoFile ($file)
 {
     my $fn = $file;
     $fn =~ s/(.*)\.\w+/$1.uno/;
@@ -166,7 +163,7 @@ fun openUnoFile($file)
 
 =cut
 
-fun closeUnoFile()
+fun closeUnoFile ()
 {
     printUno("}");
     close $uno;
@@ -176,7 +173,7 @@ fun closeUnoFile()
 
 =cut
 
-fun getPatternName($file)
+fun getPatternName ($file)
 {
     my $fn = basename($file);
     $fn =~ s/(.*)\.\w+/$1/;
@@ -189,7 +186,7 @@ fun getPatternName($file)
 
 =cut
 
-fun printHeader ($file)
+method printHeader ($file)
 {
     my $patternName = &getPatternName($file);
 
@@ -199,7 +196,8 @@ fun printHeader ($file)
     &printUno("AliasMap \"DefaultAliasMap\";");
     &printUno("Type Generic;\n");
 
-    &printUno("PinList = \"DATA_pin+CLK_pin+FX_TRIGGER_pin\";\n");
+    my $pinlist = join( "+", $self->getPinList() );
+    &printUno("PinList = \"$pinlist\";\n");
 
     #print $uno "CaptureRef MipiCapture = \"DATA_pin\";\n";
     #print $uno "RegSendRef MipiSend = \"DATA_pin+FX_TRIGGER_pin\";\n";
@@ -258,12 +256,12 @@ method regRead ($reg)
 
 =cut
 
-fun increaseRegData(Ref $ref)
+fun increaseRegData (Ref $ref)
 {
     return 0 if $$ref =~ /FF$/i;
     my $dec = hex($$ref);
     ++$dec;
-    $$ref = sprintf("%X", $dec);
+    $$ref = sprintf( "%X", $dec );
 }
 
 =head2 regWriteRead256Bytes
@@ -460,6 +458,102 @@ method regRW ( Str $reg, $read)
         push @vec, $vec;
     }
     &printVectors( \@vec );
+}
+
+=head2 setPinName
+
+=cut
+
+method setPinName (Str $clock, Str $data, $dut = 1)
+{
+    $self->{'dut'}->[ $dut - 1 ]->{"clock"} = $clock;
+    $self->{'dut'}->[ $dut - 1 ]->{"data"}  = $data;
+}
+
+=head2 getPinName
+
+=cut
+
+method getPinName ($dut = 1)
+{
+    return (
+        $self->{'dut'}->[ $dut - 1 ]->{"clock"},
+        $self->{'dut'}->[ $dut - 1 ]->{"data"}
+    );
+}
+
+=head2 addTriggerPin
+
+=cut
+
+method addTriggerPin (Str $name)
+{
+    $self->{'trigger'} = $name;
+}
+
+=head2 getTriggerPin
+
+=cut
+
+method getTriggerPin ()
+{
+    return $self->{'trigger'} if $self->{'trigger'};
+}
+
+=head2 addExtraPin
+
+=cut
+
+method addExtraPin (Str $name, Str $data)
+{
+    $self->{'pin'}->{$name} = $data;
+}
+
+=head2 getExtraPins
+
+=cut
+
+method getExtraPins ()
+{
+    return sort keys %{ $self->{'pin'} };
+}
+
+=head2 getDutNum
+
+=cut
+
+method getDutNum ()
+{
+    my $num = @{ $self->{'dut'} };
+    return $num;
+}
+
+=head2 getPinList
+
+=cut
+
+method getPinList ()
+{
+    my @pins;
+    for my $dut ( @{ $self->{'dut'} } ) {
+        push @pins, $dut->{'clock'};
+        push @pins, $dut->{'data'};
+    }
+
+    push @pins, $self->getTriggerPin() if $self->getTriggerPin();
+    push @pins, $self->getExtraPins();
+    return @pins;
+}
+
+=head2 BUILD
+
+ called after constructor by Moose
+
+=cut
+
+method BUILD ($var)
+{
+    $self->setPinName( "CLK_pin", "DATA_pin" );
 }
 
 =head1 AUTHOR
