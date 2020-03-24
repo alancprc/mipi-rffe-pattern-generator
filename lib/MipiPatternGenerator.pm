@@ -100,7 +100,7 @@ has 'debug' => ( is => 'rw', default => 0 );
 method generate (Str $file)
 {
     &validateInputFile($file);
-    my @ins = &parsePseudoPattern($file);
+    my @ins = &parsePseudoPatternLegacy($file);
 
     &openUnoFile($file);
 
@@ -209,14 +209,13 @@ method printHeader ($file)
     #print $uno "\$start\n";
 }
 
-=head2 parsePseudoPattern
+=head2 parsePseudoPatternLegacy
 
- read pseudo pattern file, translate states to register read/write operation by
- lookup the register table
+ read pseudo pattern file
 
 =cut
 
-fun parsePseudoPattern ($inputfile)
+fun parsePseudoPatternLegacy ($inputfile)
 {
     open( my $fh, "<", $inputfile ) or die "$inputfile doesn't exist.";
     my @data = <$fh>;
