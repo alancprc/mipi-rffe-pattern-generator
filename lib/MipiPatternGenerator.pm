@@ -603,9 +603,9 @@ method writeVectors (ArrayRef $ref)
         } elsif (/trig/i) {
             $self->printDataInsComment( $self->getIdleVectorData(1),
                 "[TRIG]", "trigger" );
+        } elsif (/0x(\w+)/) {    #read/write a single address
         } elsif (/(\w+)/) {
-            &printUno("state: $1");    # read/write
-            $self->getVectorData($1);
+            $self->getVectorData($1);    # read/write
         }
     }
 }
@@ -629,14 +629,137 @@ method printDataInsComment (Str $data, Str $ins, Str $cmt, Str $tset = $tsetWrit
 
 =cut
 
-method getVectorData (Str $reg)
+method getVectorData (Str $ins)
 {
-    $reg =~ s/\s+//g;
-    my @reg = split /,/, $reg;
-    while ( @reg < $self->dutNum ) {
-        push @reg, "nop";
+    # pading with nop if regs is less than dut number
+    $ins =~ s/\s+//g;
+    my @ins = split /,/, $ins;
+    while ( @ins < $self->dutNum ) {
+        push @ins, "nop";
     }
-    printUno("@reg");
+
+    # lookup registers
+    my @vecs;
+    my @comment;
+    my @tset;
+    for my $dut ( 0 .. $self->dutNum - 1 ) {
+        if ( $ins[$dut] eq "nop" ) {
+            $vecs[ 2 * $dut ] = ["0"];
+            $vecs[ 2 * $dut + 1 ] = ["0"];
+            next;
+        }
+
+        my @regs = $self->lookupRegisters( $ins[$dut] );
+        my @clock;
+        my @data;
+        for my $reg (@regs) {
+            push @clock, &getClockArray(0);
+            push @data, &getDataArray( $reg, 0 );
+            if ( $dut == 0 ) {
+                push @comment, &getCommentArray( 0, $reg );
+                push @tset, $self->getTimeSetArray(0);
+            }
+        }
+        $vecs[ 2 * $dut ] = \@clock;
+        $vecs[ 2 * $dut + 1 ] = \@data;
+    }
+    &alignVectorData( \@vecs );
+    &transposeVectorData( \@vecs );
+    $self->addTriggerPinData( \@vecs );
+    $self->addExtraPinData( \@vecs );
+    $self->printVectorData( \@vecs, \@tset, \@comment );
+}
+
+=head2 printVectorData
+
+ print vector data to uno file
+
+  0101          "comment"
+ *0101* tset;   "comment"
+
+=cut
+
+method printVectorData (ArrayRef $dataref, ArrayRef $tsetref, ArrayRef $cmtref)
+{
+    for my $i ( 0 .. $#$dataref ) {
+        my $data = join '', @{ $dataref->[$i] };
+        my $str  = sprintf( "*%s* %s; %-18s \"%s\"",
+            $data, $tsetref->[$i], "", $cmtref->[$i] );
+        printUno($str);
+    }
+}
+
+=head2 print
+
+=head2 addTriggerPinData
+
+=cut
+
+method addTriggerPinData ($ref)
+{
+    if ( $self->getTriggerPin() ) {
+        push @$_, "0" for @$ref;
+    }
+}
+
+=head2 addExtraPinData
+
+=cut
+
+method addExtraPinData ($ref)
+{
+    for my $pin ( @{ $self->{'pin'} } ) {
+        push @$_, $pin->{'data'} for @$ref;
+    }
+}
+
+=head2 alignVectorData
+
+=cut
+
+fun alignVectorData (ArrayRef $ref)
+{
+    # get max length
+    my $maxlen = 0;
+    for (@$ref) {
+        my $len = @{$_};
+        $maxlen = $len > $maxlen ? $len : $maxlen;
+    }
+    for (@$ref) {
+        while ( @{$_} < $maxlen ) {
+            push @{$_}, "0";
+        }
+    }
+}
+
+=head2 transposeVectorData
+
+ transpose array of columns to array of rows
+
+=cut
+
+fun transposeVectorData (ArrayRef $ref)
+{
+    my @new;
+    for my $i ( 0 .. $#$ref ) {
+        for my $j ( 0 .. $#{ $ref->[0] } ) {
+            $new[$j][$i] = $ref->[$i]->[$j];
+        }
+    }
+    @$ref = @new;
+}
+
+=head2 lookupRegisters
+
+ lookup register adress/data in register table.
+ e.g.: GSM_HB_HPM => (0xE1C38, 0xE0001)
+
+=cut
+
+method lookupRegisters (Str $ins)
+{
+    return $ins if $ins eq "nop";
+    return ( "0xE1C38", "0xE0001" );
 }
 
 =head2 getIdleVectorData
