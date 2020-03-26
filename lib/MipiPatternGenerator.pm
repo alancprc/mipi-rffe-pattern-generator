@@ -602,7 +602,7 @@ method writeVectors (ArrayRef $ref)
                 "jump" );
         } elsif (/trig/i) {
             $self->printDataInsComment( $self->getIdleVectorData(1),
-                "<TRIG>", "trigger" );
+                "[TRIG]", "trigger" );
         } elsif (/(\w+)/) {
             &printUno("state: $1");    # read/write
             $self->getVectorData($1);
