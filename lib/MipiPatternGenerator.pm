@@ -609,9 +609,9 @@ method writeVectors (ArrayRef $ref)
         } elsif (/trig/i) {
             $self->printDataInsComment( $self->getIdleVectorData(1),
                 "[TRIG]", "trigger" );
-        } elsif (/^R:\s*(0x\w+)/) {    #read/write a single address
-        } elsif (/(\w+)/) {
-            $self->getVectorData($1);    # read/write
+        } elsif (/^(R:)?\s*(\w+)/) {
+            my $read = $1 ? 1 : 0;
+            $self->getVectorData( $2, $read );    # read/write
         }
     }
 }
@@ -633,9 +633,11 @@ method printDataInsComment (Str $data, Str $ins, Str $cmt, Str $tset = $tsetWrit
 
 =head2 getVectorData
 
+ write read/write mipi operation segment into pattern file
+
 =cut
 
-method getVectorData (Str $ins)
+method getVectorData (Str $ins, Int $read)
 {
     # pading with nop if regs is less than dut number
     $ins =~ s/\s+//g;
@@ -659,11 +661,11 @@ method getVectorData (Str $ins)
         my @clock;
         my @data;
         for my $reg (@regs) {
-            push @clock, &getClockArray(0);
-            push @data, &getDataArray( $reg, 0 );
+            push @clock, &getClockArray($read);
+            push @data, &getDataArray( $reg, $read );
             if ( $dut == 0 ) {
-                push @comment, &getCommentArray( 0, $reg );
-                push @tset, $self->getTimeSetArray(0);
+                push @comment, &getCommentArray( $read, $reg );
+                push @tset, $self->getTimeSetArray($read);
             }
         }
         $vecs[ 2 * $dut ] = \@clock;
