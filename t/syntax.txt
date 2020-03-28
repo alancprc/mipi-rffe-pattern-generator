@@ -3,11 +3,13 @@ ClockPinName: clk1, clk2
 DataPinName: data1, data2
 TriggerPinName: fx_trigger
 ExtraPinName: vramp=0,dummy=1
+RegisterTable: t/reg7928.csv, t/reg7928.csv
 
-labelA:
-    STATE
+Label: test
+    LB_GMSK_HPM
     wait 
     trig
     wait 577
     jmp pa_off
     stop
+R:  0xE0011

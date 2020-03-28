@@ -29,7 +29,7 @@ pattern.txt if the pseudo pattern file, contains something like following:
 
    ======================================================
    DUT 1, 2                - required, indicates how many duts
-   labelA:                 - optional
+   Label: labelA           - optional
        GSM_HB_HPM, nop     - register state in registerN.csv 
        wait 1              - optional, wait 1 cycle
        TRIG                - optional, trigger pin sets to 1
@@ -463,6 +463,9 @@ method regRW ( Str $reg, $read)
 
 =head2 setPinName
 
+ set clock/data pin name for dut.
+ the dut number starts from 1.
+
 =cut
 
 method setPinName (Str $clock, Str $data, $dut = 1)
@@ -472,6 +475,9 @@ method setPinName (Str $clock, Str $data, $dut = 1)
 }
 
 =head2 getPinName
+
+ get clock/data pin name for dut.
+ the dut number starts from 1.
 
 =cut
 
@@ -588,7 +594,7 @@ method gen (Str $file)
 method writeVectors (ArrayRef $ref)
 {
     for (@$ref) {
-        if (/(\w+):/) {    # label
+        if (/^Label:\s*(\w+)/) {    # label
             &printUno("\$$1");
         } elsif (/wait\s*(\d+)*/i) {
             my $ins = $1 ? "<RPT $1>" : "";
@@ -603,7 +609,7 @@ method writeVectors (ArrayRef $ref)
         } elsif (/trig/i) {
             $self->printDataInsComment( $self->getIdleVectorData(1),
                 "[TRIG]", "trigger" );
-        } elsif (/0x(\w+)/) {    #read/write a single address
+        } elsif (/^R:\s*(0x\w+)/) {    #read/write a single address
         } elsif (/(\w+)/) {
             $self->getVectorData($1);    # read/write
         }
@@ -649,7 +655,7 @@ method getVectorData (Str $ins)
             next;
         }
 
-        my @regs = $self->lookupRegisters( $ins[$dut] );
+        my @regs = $self->lookupRegisters( $ins[$dut], $dut );
         my @clock;
         my @data;
         for my $reg (@regs) {
@@ -752,14 +758,56 @@ fun transposeVectorData (ArrayRef $ref)
 =head2 lookupRegisters
 
  lookup register adress/data in register table.
+ if the $ins matches '0xADDD', it's returned unchanged.
+ $dutNum starts from 0.
+
  e.g.: GSM_HB_HPM => (0xE1C38, 0xE0001)
 
 =cut
 
-method lookupRegisters (Str $ins)
+method lookupRegisters (Str $ins, $dutNum)
 {
     return $ins if $ins eq "nop";
-    return ( "0xE1C38", "0xE0001" );
+    return $ins if $ins =~ /0x\w+/i;
+
+    die "there's no $ins in registerTable."
+      unless $self->{'table'}->[$dutNum]->{$ins};
+    return @{ $self->{'table'}->[$dutNum]->{$ins} };
+}
+
+=head2 readRegisterTable
+
+=cut
+
+method readRegisterTable (ArrayRef $ref)
+{
+    die unless $self->dutNum == @$ref;
+
+    for my $dut ( 0 .. $self->dutNum - 1 ) {
+        open my $fh, "<", $ref->[$dut]
+          or die $ref->[$dut] . "file doesn't exist";
+        my @content = <$fh>;
+        close $fh;
+
+        # remove trailing new line
+        s/\R// for @content;
+
+        my @addr = split /,/, shift @content;
+        shift @addr;
+
+        for (@content) {
+            my @data = split /,/;
+            my $name = shift @data;
+
+            # concate address and data;
+            for my $i ( 0 .. $#data ) {
+                my $data = $data[$i];
+                $data =~ s/0x//i;
+                $data[$i] = $addr[$i] . $data;
+            }
+            $self->{'table'}->[$dut]->{$name} = \@data;
+        }
+    }
 }
 
 =head2 getIdleVectorData
@@ -837,6 +885,14 @@ method parsePseudoPattern ($file)
         my ( $pin, $value ) = split /=/;
         $self->addExtraPin( $pin, $value );
     }
+
+    # registerTable
+    $line = shift @data;
+    die unless $line =~ /^RegisterTable:/;
+    $line =~ s/\s//g;
+    $line =~ s/.*://g;
+    my @regtable = split /,/, $line;
+    $self->readRegisterTable( \@regtable );
     return @data;
 }
 
