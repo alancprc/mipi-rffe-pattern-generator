@@ -609,7 +609,7 @@ method writeVectors (ArrayRef $ref)
         } elsif (/trig/i) {
             $self->printDataInsComment( $self->getIdleVectorData(1),
                 "[TRIG]", "trigger" );
-        } elsif (/^(R:)?\s*(\w+)/) {
+        } elsif (/^(R:)?\s*(\w+\s*(?:,\s*\w+)*)/) {
             my $read = $1 ? 1 : 0;
             $self->getVectorData( $2, $read );    # read/write
         }
@@ -642,6 +642,8 @@ method getVectorData (Str $ins, Int $read)
     # pading with nop if regs is less than dut number
     $ins =~ s/\s+//g;
     my @ins = split /,/, $ins;
+    die "column number '@ins' more than dut number " . $self->dutNum . "."
+      if @ins > $self->dutNum;
     while ( @ins < $self->dutNum ) {
         push @ins, "nop";
     }
