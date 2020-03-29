@@ -4,14 +4,8 @@ use 5.010001;
 use strict;
 use warnings;
 
-use Moose;
-use Function::Parameters;
-use Types::Standard qw(Str Int ArrayRef RegexpRef Ref);
-use JSON -convert_blessed_universally;
 use File::Basename;
 use File::Spec;
-use File::Path qw(make_path remove_tree);
-use Carp qw(croak carp);
 
 use Exporter qw(import);
 our @EXPORT = qw();
@@ -72,18 +66,30 @@ our $VERSION = '0.01';
 
 =cut
 
-has 'dutNum' => ( is => 'rw', default => 1 );
+=head2 new
 
-=head2 BUILD
-
- called after constructor by Moose
+ constructor
 
 =cut
 
-method BUILD ($var)
+sub new
 {
+    my $self = {};
+    bless $self, "MipiPatternGenerator";
     $self->setPinName( "CLK_pin", "DATA_pin" );
     $self->setTimeSet( "tsetWrite", "tsetRead" );
+    return $self;
+}
+
+=head2 dutNum
+
+=cut
+
+sub dutNum
+{
+    my ( $self, $num ) = @_;
+    $self->{'dutNum'} = $num if $num;
+    return $self->{'dutNum'};
 }
 
 =head2 generate
@@ -92,8 +98,10 @@ method BUILD ($var)
 
 =cut
 
-method generate (Str $file)
+sub generate
 {
+    my ( $self, $file ) = @_;
+
     &validateInputFile($file);
     my @ins = &parsePseudoPatternLegacy($file);
 
@@ -124,8 +132,10 @@ method generate (Str $file)
 
 =cut
 
-method setTimeSet ($writeTset, $readTset)
+sub setTimeSet
 {
+    my ( $self, $writeTset, $readTset ) = @_;
+
     $self->{'tsetWrite'} = $writeTset;
     $self->{'tsetRead'}  = $readTset;
 }
@@ -136,8 +146,9 @@ method setTimeSet ($writeTset, $readTset)
 
 =cut
 
-fun validateInputFile (Str $file)
+sub validateInputFile
 {
+    my ($file) = @_;
     die "invalid suffix '.uno', please rename the suffix and try again"
       if $file =~ /.*\.uno$/;
 }
@@ -146,12 +157,13 @@ fun validateInputFile (Str $file)
 
 =cut
 
-method openUnoFile ($file)
+sub openUnoFile
 {
+    my ( $self, $file ) = @_;
     my $fn = $file;
     $fn =~ s/(.*)\.\w+/$1.uno/;
 
-    open my $fh, ">", $fn;
+    open( my $fh, ">", $fn ) or die "fail to open $fn.";
     $self->{'fh'} = $fh;
 }
 
@@ -159,8 +171,10 @@ method openUnoFile ($file)
 
 =cut
 
-method closeUnoFile ()
+sub closeUnoFile
 {
+    my $self = shift;
+
     $self->printUno("}");
     close $self->{'fh'};
 }
@@ -169,8 +183,10 @@ method closeUnoFile ()
 
 =cut
 
-fun getPatternName ($file)
+sub getPatternName
 {
+    my $file = shift;
+
     my $fn = basename($file);
     $fn =~ s/(.*)\.\w+/$1/;
     return $fn;
@@ -182,8 +198,10 @@ fun getPatternName ($file)
 
 =cut
 
-method printHeader ($file)
+sub printHeader
 {
+    my ( $self, $file ) = @_;
+
     my $patternName = &getPatternName($file);
 
     $self->printUno("Unison:SyntaxRevision6.310000;");
@@ -211,8 +229,10 @@ method printHeader ($file)
 
 =cut
 
-fun parsePseudoPatternLegacy ($inputfile)
+sub parsePseudoPatternLegacy
 {
+    my $inputfile = shift;
+
     open( my $fh, "<", $inputfile ) or die "$inputfile doesn't exist.";
     my @data = <$fh>;
     close $fh;
@@ -228,8 +248,10 @@ fun parsePseudoPatternLegacy ($inputfile)
 
 =cut
 
-method regWrite ($reg)
+sub regWrite
 {
+    my ( $self, $reg ) = @_;
+
     my $read = 0;
     return $self->regRW( $reg, $read );
 }
@@ -240,8 +262,9 @@ method regWrite ($reg)
 
 =cut
 
-method regRead ($reg)
+sub regRead
 {
+    my ( $self, $reg ) = @_;
     my $read = 1;
     return $self->regRW( $reg, $read );
 }
@@ -252,8 +275,10 @@ method regRead ($reg)
 
 =cut
 
-fun increaseRegData (Ref $ref)
+sub increaseRegData
 {
+    my $ref = shift;
+
     return 0 if $$ref =~ /FF$/i;
     my $dec = hex($$ref);
     ++$dec;
@@ -266,8 +291,10 @@ fun increaseRegData (Ref $ref)
 
 =cut
 
-method regWriteRead256Bytes ($reg)
+sub regWriteRead256Bytes
 {
+    my ( $self, $reg ) = @_;
+
     $self->regWrite($reg);
     $self->regRead($reg);
 
@@ -281,8 +308,10 @@ method regWriteRead256Bytes ($reg)
 
 =cut
 
-method printVectors (ArrayRef $ref)
+sub printVectors
 {
+    my ( $self, $ref ) = @_;
+
     $self->printVector($_) for @$ref;
 }
 
@@ -292,8 +321,10 @@ method printVectors (ArrayRef $ref)
 
 =cut
 
-method printVector (Str $vector)
+sub printVector
 {
+    my ( $self, $vector ) = @_;
+
     my $fh = $self->{'fh'};
     say $fh $vector;
 }
@@ -304,8 +335,10 @@ method printVector (Str $vector)
 
 =cut
 
-method printUno (Str $str)
+sub printUno
 {
+    my ( $self, $str ) = @_;
+
     my $fh = $self->{'fh'};
     say $fh $str;
 }
@@ -316,8 +349,10 @@ method printUno (Str $str)
 
 =cut
 
-fun replace01withLH (ArrayRef $dataref, Int $start, Int $len)
+sub replace01withLH
 {
+    my ( $dataref, $start, $len ) = @_;
+
     for my $idx ( $start .. $start + $len - 1 ) {
         $dataref->[$idx] =~ s/0/L/;
         $dataref->[$idx] =~ s/1/H/;
@@ -331,8 +366,10 @@ fun replace01withLH (ArrayRef $dataref, Int $start, Int $len)
 
 =cut
 
-method getTimeSetArray (Int $read)
+sub getTimeSetArray
 {
+    my ( $self, $read ) = @_;
+
     my $bits = 3 + 23 + $read;
     my @tset = ( $self->{'tsetWrite'} ) x $bits;
 
@@ -346,8 +383,11 @@ method getTimeSetArray (Int $read)
 
 =cut
 
-fun getClockArray (Int $read, Str $reg = "")
+sub getClockArray
 {
+    my ( $read, $reg ) = @_;
+    $reg = "" unless $reg;
+
     return ("0") x ( 23 + $read ) if $reg eq "nop";
 
     my $ones  = 23 + $read;
@@ -362,8 +402,10 @@ fun getClockArray (Int $read, Str $reg = "")
 
 =cut
 
-fun getDataArray (Str $reg, Int $read)
+sub getDataArray
 {
+    my ( $reg, $read ) = @_;
+
     return ("0") x ( 23 + $read ) if $reg eq "nop";
 
     my @data = split //, sprintf( "%020b", hex($reg) );
@@ -396,8 +438,11 @@ fun getDataArray (Str $reg, Int $read)
 
 =cut
 
-fun getCommentArray (Int $read, Str $reg="")
+sub getCommentArray
 {
+    my ( $read, $reg ) = @_;
+    $reg = "" unless $reg;
+
     my @comment;
     if ($read) {
         @comment = qw( SSC SSC SSC SlaveAddr3 SlaveAddr2 SlaveAddr1 SlaveAddr0
@@ -421,8 +466,10 @@ fun getCommentArray (Int $read, Str $reg="")
 
 =cut
 
-fun oddParity (@data)
+sub oddParity
 {
+    my @data = @_;
+
     my $num = grep /1/, @data;
     return ( $num + 1 ) % 2;
 }
@@ -433,8 +480,10 @@ fun oddParity (@data)
 
 =cut
 
-method regRW ( Str $reg, $read)
+sub regRW
 {
+    my ( $self, $reg, $read ) = @_;
+
     my @data    = &getDataArray( $reg, $read );
     my @clock   = &getClockArray($read);
     my @tset    = $self->getTimeSetArray($read);
@@ -468,8 +517,11 @@ method regRW ( Str $reg, $read)
 
 =cut
 
-method setPinName (Str $clock, Str $data, $dut = 1)
+sub setPinName
 {
+    my ( $self, $clock, $data, $dut ) = @_;
+    $dut = 1 unless $dut;
+
     $self->{'dut'}->[ $dut - 1 ]->{"clock"} = $clock;
     $self->{'dut'}->[ $dut - 1 ]->{"data"}  = $data;
 }
@@ -481,8 +533,11 @@ method setPinName (Str $clock, Str $data, $dut = 1)
 
 =cut
 
-method getPinName ($dut = 1)
+sub getPinName
 {
+    my ( $self, $dut ) = @_;
+    $dut = 1 unless $dut;
+
     return (
         $self->{'dut'}->[ $dut - 1 ]->{"clock"},
         $self->{'dut'}->[ $dut - 1 ]->{"data"}
@@ -493,8 +548,10 @@ method getPinName ($dut = 1)
 
 =cut
 
-method addTriggerPin (Str $name)
+sub addTriggerPin
 {
+    my ( $self, $name ) = @_;
+
     $self->{'trigger'} = $name;
 }
 
@@ -502,8 +559,10 @@ method addTriggerPin (Str $name)
 
 =cut
 
-method getTriggerPin ()
+sub getTriggerPin
 {
+    my $self = shift;
+
     return $self->{'trigger'} if $self->{'trigger'};
 }
 
@@ -511,8 +570,10 @@ method getTriggerPin ()
 
 =cut
 
-method addExtraPin (Str $name, Str $data)
+sub addExtraPin
 {
+    my ( $self, $name, $data ) = @_;
+
     push @{ $self->{'pin'} }, { name => $name, data => $data };
 }
 
@@ -520,8 +581,10 @@ method addExtraPin (Str $name, Str $data)
 
 =cut
 
-method getExtraPins ()
+sub getExtraPins
 {
+    my $self = shift;
+
     my @pin;
     for my $ref ( @{ $self->{'pin'} } ) {
         push @pin, $ref->{'name'};
@@ -533,8 +596,10 @@ method getExtraPins ()
 
 =cut
 
-method getDutNum ()
+sub getDutNum
 {
+    my $self = shift;
+
     my $num = @{ $self->{'dut'} };
     return $num;
 }
@@ -543,8 +608,10 @@ method getDutNum ()
 
 =cut
 
-method getPinList ()
+sub getPinList
 {
+    my $self = shift;
+
     my @pins;
     for my $dut ( @{ $self->{'dut'} } ) {
         push @pins, $dut->{'clock'};
@@ -562,8 +629,10 @@ method getPinList ()
 
 =cut
 
-method gen (Str $file)
+sub gen
 {
+    my ( $self, $file ) = @_;
+
     &validateInputFile($file);
     my @ins = $self->parsePseudoPattern($file);
 
@@ -580,8 +649,10 @@ method gen (Str $file)
 
 =cut
 
-method writeVectors (ArrayRef $ref)
+sub writeVectors
 {
+    my ( $self, $ref ) = @_;
+
     for (@$ref) {
         if (/^Label:\s*(\w+)/) {    # label
             $self->printUno("\$$1");
@@ -609,8 +680,11 @@ method writeVectors (ArrayRef $ref)
 
 =cut
 
-method printDataInsComment (Str $data, Str $ins, Str $cmt, Str $tset = $self->{'tsetWrite'})
+sub printDataInsComment
 {
+    my ( $self, $data, $ins, $cmt, $tset ) = @_;
+    $tset = $self->{'tsetWrite'} unless $tset;
+
     my $str = join( '', '*', $data, '* ', $tset, '; ', $ins );
     my $num = $self->getPinList() + 30;
     $str = sprintf( "%-${num}s", $str );
@@ -626,8 +700,10 @@ method printDataInsComment (Str $data, Str $ins, Str $cmt, Str $tset = $self->{'
 
 =cut
 
-method getVectorData (Str $ins, Int $read)
+sub getVectorData
 {
+    my ( $self, $ins, $read ) = @_;
+
     # pading with nop if regs is less than dut number
     $ins =~ s/\s+//g;
     my @ins = split /,/, $ins;
@@ -677,8 +753,10 @@ method getVectorData (Str $ins, Int $read)
 
 =cut
 
-method printVectorData (ArrayRef $dataref, ArrayRef $tsetref, ArrayRef $cmtref)
+sub printVectorData
 {
+    my ( $self, $dataref, $tsetref, $cmtref ) = @_;
+
     for my $i ( 0 .. $#$dataref ) {
         my $data = join '', @{ $dataref->[$i] };
         my $str  = sprintf( "*%s* %s; %-18s \"%s\"",
@@ -693,8 +771,10 @@ method printVectorData (ArrayRef $dataref, ArrayRef $tsetref, ArrayRef $cmtref)
 
 =cut
 
-method addTriggerPinData ($ref)
+sub addTriggerPinData
 {
+    my ( $self, $ref ) = @_;
+
     if ( $self->getTriggerPin() ) {
         push @$_, "0" for @$ref;
     }
@@ -704,8 +784,10 @@ method addTriggerPinData ($ref)
 
 =cut
 
-method addExtraPinData ($ref)
+sub addExtraPinData
 {
+    my ( $self, $ref ) = @_;
+
     for my $pin ( @{ $self->{'pin'} } ) {
         push @$_, $pin->{'data'} for @$ref;
     }
@@ -715,8 +797,10 @@ method addExtraPinData ($ref)
 
 =cut
 
-fun alignVectorData (ArrayRef $ref)
+sub alignVectorData
 {
+    my $ref = shift;
+
     # get max length
     my $maxlen = 0;
     for (@$ref) {
@@ -734,8 +818,10 @@ fun alignVectorData (ArrayRef $ref)
 
 =cut
 
-fun alignTimeSet ( ArrayRef $ref )
+sub alignTimeSet
 {
+    my $ref = shift;
+
     my $maxlen = 0;
     my $maxidx = 0;
     my $i      = 0;
@@ -754,8 +840,10 @@ fun alignTimeSet ( ArrayRef $ref )
 
 =cut
 
-fun mergeComment (ArrayRef $ref)
+sub mergeComment
 {
+    my $ref = shift;
+
     my $maxlen = 0;
     my $maxidx = 0;
     for my $i ( 0 .. $#$ref ) {
@@ -786,8 +874,10 @@ fun mergeComment (ArrayRef $ref)
 
 =cut
 
-fun transposeVectorData (ArrayRef $ref)
+sub transposeVectorData
 {
+    my $ref = shift;
+
     my @new;
     for my $i ( 0 .. $#$ref ) {
         for my $j ( 0 .. $#{ $ref->[0] } ) {
@@ -807,8 +897,10 @@ fun transposeVectorData (ArrayRef $ref)
 
 =cut
 
-method lookupRegisters (Str $ins, $dutNum)
+sub lookupRegisters
 {
+    my ( $self, $ins, $dutNum ) = @_;
+
     return $ins if $ins eq "nop";
     return $ins if $ins =~ /0x\w+/i;
 
@@ -821,8 +913,10 @@ method lookupRegisters (Str $ins, $dutNum)
 
 =cut
 
-method readRegisterTable (ArrayRef $ref)
+sub readRegisterTable
 {
+    my ( $self, $ref ) = @_;
+
     die unless $self->dutNum == @$ref;
 
     for my $dut ( 0 .. $self->dutNum - 1 ) {
@@ -856,8 +950,11 @@ method readRegisterTable (ArrayRef $ref)
 
 =cut
 
-method getIdleVectorData ($trigger=0)
+sub getIdleVectorData
 {
+    my ( $self, $trigger ) = @_;
+    $trigger = 0 unless $trigger;
+
     my $vec;
     $vec .= "00" x $self->dutNum;
     $vec .= $trigger ? "1" : "0" if $self->getTriggerPin();
@@ -876,8 +973,10 @@ method getIdleVectorData ($trigger=0)
 
 =cut
 
-method parsePseudoPattern ($file)
+sub parsePseudoPattern
 {
+    my ( $self, $file ) = @_;
+
     open( my $fh, "<", $file ) or die "$file doesn't exist.";
     my @data = <$fh>;
     close $fh;
@@ -888,7 +987,8 @@ method parsePseudoPattern ($file)
     # dut number
     my $line = shift @data;
     die unless $line =~ /^DUT:/;
-    $self->dutNum( scalar split /,/, $line );
+    my $num = () = split /,/, $line, -1;
+    $self->dutNum($num);
 
     # clock
     $line = shift @data;
@@ -994,8 +1094,5 @@ This is free software, licensed under:
 
 
 =cut
-
-no Moose;
-__PACKAGE__->meta->make_immutable;
 
 1;    # End of MipiPatternGenerator
