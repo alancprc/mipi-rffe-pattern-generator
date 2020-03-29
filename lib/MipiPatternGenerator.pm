@@ -350,8 +350,10 @@ method getTimeSetArray (Int $read)
 
 =cut
 
-fun getClockArray (Int $read)
+fun getClockArray (Int $read, Str $reg = "")
 {
+    return ("0") x ( 23 + $read ) if $reg eq "nop";
+
     my $ones  = 23 + $read;
     my $zeros = 3;
     my $str   = "0" x $zeros . '1' x $ones;
@@ -366,6 +368,8 @@ fun getClockArray (Int $read)
 
 fun getDataArray (Str $reg, Int $read)
 {
+    return ("0") x ( 23 + $read ) if $reg eq "nop";
+
     my @data = split //, sprintf( "%020b", hex($reg) );
 
     # set read/write cmd
@@ -653,24 +657,16 @@ method getVectorData (Str $ins, Int $read)
     my @tsets;
     my @comments;
     for my $dut ( 0 .. $self->dutNum - 1 ) {
-        if ( $ins[$dut] eq "nop" ) {
-            $vecs[ 2 * $dut ]     = ["0"];
-            $vecs[ 2 * $dut + 1 ] = ["0"];
-            $tsets[$dut]          = [];
-            $comments[$dut]       = [];
-            next;
-        }
-
         my @regs = $self->lookupRegisters( $ins[$dut], $dut );
         my @clock;
         my @data;
         my @tset;
         my @cmt;
         for my $reg (@regs) {
-            push @clock, &getClockArray($read);
+            push @clock, &getClockArray( $read, $reg );
             push @data, &getDataArray( $reg, $read );
-            push @cmt, &getCommentArray( $read, join( ":", $ins[$dut], $reg ) );
             push @tset, $self->getTimeSetArray($read);
+            push @cmt, &getCommentArray( $read, join( ":", $ins[$dut], $reg ) );
         }
 
         $vecs[ 2 * $dut ]     = \@clock;
