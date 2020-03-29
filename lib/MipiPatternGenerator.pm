@@ -163,7 +163,7 @@ sub openUnoFile
     my $fn = $file;
     $fn =~ s/(.*)\.\w+/$1.uno/;
 
-    open( my $fh, ">", $fn ) or die "fail to open $fn.";
+    open( my $fh, ">", $fn ) or die "$!";
     $self->{'fh'} = $fh;
 }
 
@@ -233,7 +233,7 @@ sub parsePseudoPatternLegacy
 {
     my $inputfile = shift;
 
-    open( my $fh, "<", $inputfile ) or die "$inputfile doesn't exist.";
+    open( my $fh, "<", $inputfile ) or die "$!";
     my @data = <$fh>;
     close $fh;
 
@@ -488,7 +488,8 @@ sub regRW
     my @tset    = $self->getTimeSetArray($read);
     my @comment = &getCommentArray($read);
 
-    die "size not match" unless $#data == $#clock and $#data == $#tset;
+    die "clock/data/tset size not match."
+      unless $#data == $#clock and $#data == $#tset;
 
     # add Read/Write register value to comment
     my $cmt = $read ? "read" : "write";
@@ -916,11 +917,11 @@ sub readRegisterTable
 {
     my ( $self, $ref ) = @_;
 
-    die unless $self->dutNum == @$ref;
+    die "RegisterTable file number is not equal to dut number."
+      unless $self->dutNum == @$ref;
 
     for my $dut ( 0 .. $self->dutNum - 1 ) {
-        open my $fh, "<", $ref->[$dut]
-          or die $ref->[$dut] . "file doesn't exist";
+        open my $fh, "<", $ref->[$dut] or die "$!";
         my @content = <$fh>;
         close $fh;
 
@@ -976,7 +977,7 @@ sub parsePseudoPattern
 {
     my ( $self, $file ) = @_;
 
-    open( my $fh, "<", $file ) or die "$file doesn't exist.";
+    open( my $fh, "<", $file ) or die "$!";
     my @data = <$fh>;
     close $fh;
 
@@ -985,32 +986,34 @@ sub parsePseudoPattern
 
     # dut number
     my $line = shift @data;
-    die unless $line =~ /^DUT:/;
+    die "missing 'DUT:' line in $file." unless $line =~ /^DUT:/;
     my $num = () = split /,/, $line, -1;
     $self->dutNum($num);
 
     # clock
     $line = shift @data;
-    die unless $line =~ /^ClockPinName:/;
+    die "missing 'ClockPinName:' line in $file."
+      unless $line =~ /^ClockPinName:/;
     $line =~ s/\s//g;
     $line =~ s/.*://g;
     my @clockpins = split /,/, $line;
 
     # data
     $line = shift @data;
-    die unless $line =~ /^DataPinName:/;
+    die "missing 'DataPinName:' line in $file." unless $line =~ /^DataPinName:/;
     $line =~ s/\s//g;
     $line =~ s/.*://g;
     my @datapins = split /,/, $line;
 
-    die "clock/data pin number not match!" unless @clockpins == @datapins;
+    die "clock/data pin number does not match!" unless @clockpins == @datapins;
     for my $i ( 0 .. @clockpins - 1 ) {
         $self->setPinName( $clockpins[$i], $datapins[$i], $i + 1 );
     }
 
     # trigger
     $line = shift @data;
-    die unless $line =~ /^TriggerPinName:/;
+    die "missing 'TriggerPinName:' line in $file."
+      unless $line =~ /^TriggerPinName:/;
     $line =~ s/\s//g;
     $line =~ s/.*://g;
     my $trigger = $line;
@@ -1018,7 +1021,8 @@ sub parsePseudoPattern
 
     # extra
     $line = shift @data;
-    die unless $line =~ /^ExtraPinName:/;
+    die "missing 'ExtraPinName:' line in $file."
+      unless $line =~ /^ExtraPinName:/;
     $line =~ s/\s//g;
     $line =~ s/.*://g;
     my @extra = split /,/, $line;
@@ -1029,7 +1033,8 @@ sub parsePseudoPattern
 
     # registerTable
     $line = shift @data;
-    die unless $line =~ /^RegisterTable:/;
+    die "missing 'RegisterTable:' line in $file."
+      unless $line =~ /^RegisterTable:/;
     $line =~ s/\s//g;
     $line =~ s/.*://g;
     my @regtable = split /,/, $line;
