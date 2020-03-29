@@ -357,7 +357,6 @@ sub replace01withLH
         $dataref->[$idx] =~ s/0/L/;
         $dataref->[$idx] =~ s/1/H/;
     }
-    say @$dataref;
 }
 
 =head2 getTimeSetArray
