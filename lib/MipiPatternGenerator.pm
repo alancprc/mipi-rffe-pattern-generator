@@ -60,23 +60,6 @@ Version 0.01
 
 our $VERSION = '0.01';
 
-my $tsetWrite = "TS26MHz";
-my $tsetRead  = "TS1MHz";
-
-my $pattern_name;
-
-my @slave_addr;
-my @data_addr;
-my @parity;
-my @data;
-
-my $cycle_count = 0;
-my $write_count = 0;
-my $read_count  = 0;
-my $WR_count    = 0;
-
-my $uno;
-
 =head1 SYNOPSIS
 
     use MipiPatternGenerator;
@@ -89,8 +72,19 @@ my $uno;
 
 =cut
 
-has 'debug'  => ( is => 'rw', default => 0 );
 has 'dutNum' => ( is => 'rw', default => 1 );
+
+=head2 BUILD
+
+ called after constructor by Moose
+
+=cut
+
+method BUILD ($var)
+{
+    $self->setPinName( "CLK_pin", "DATA_pin" );
+    $self->setTimeSet( "tsetWrite", "tsetRead" );
+}
 
 =head2 generate
 
@@ -103,7 +97,7 @@ method generate (Str $file)
     &validateInputFile($file);
     my @ins = &parsePseudoPatternLegacy($file);
 
-    &openUnoFile($file);
+    $self->openUnoFile($file);
 
     $self->printHeader($file);
 
@@ -117,11 +111,11 @@ method generate (Str $file)
         } elsif ( !/wait/ and /^\s*(\w+)\s*$/ ) {
 
             # label
-            printUno("\$$1");
+            $self->printUno("\$$1");
         }
     }
 
-    &closeUnoFile();
+    $self->closeUnoFile();
 }
 
 =head2 setTimeSet
@@ -132,8 +126,8 @@ method generate (Str $file)
 
 method setTimeSet ($writeTset, $readTset)
 {
-    $tsetWrite = $writeTset;
-    $tsetRead  = $readTset;
+    $self->{'tsetWrite'} = $writeTset;
+    $self->{'tsetRead'}  = $readTset;
 }
 
 =head2 validateInputFile
@@ -152,22 +146,23 @@ fun validateInputFile (Str $file)
 
 =cut
 
-fun openUnoFile ($file)
+method openUnoFile ($file)
 {
     my $fn = $file;
     $fn =~ s/(.*)\.\w+/$1.uno/;
 
-    open( $uno, ">", $fn );
+    open my $fh, ">", $fn;
+    $self->{'fh'} = $fh;
 }
 
 =head2 closeUnoFile
 
 =cut
 
-fun closeUnoFile ()
+method closeUnoFile ()
 {
-    printUno("}");
-    close $uno;
+    $self->printUno("}");
+    close $self->{'fh'};
 }
 
 =head2 getPatternName
@@ -191,14 +186,14 @@ method printHeader ($file)
 {
     my $patternName = &getPatternName($file);
 
-    &printUno("Unison:SyntaxRevision6.310000;");
-    &printUno("Pattern $patternName {");
-    &printUno("Mode MixedSignal;");
-    &printUno("AliasMap \"DefaultAliasMap\";");
-    &printUno("Type Generic;\n");
+    $self->printUno("Unison:SyntaxRevision6.310000;");
+    $self->printUno("Pattern $patternName {");
+    $self->printUno("Mode MixedSignal;");
+    $self->printUno("AliasMap \"DefaultAliasMap\";");
+    $self->printUno("Type Generic;\n");
 
     my $pinlist = join( "+", $self->getPinList() );
-    &printUno("PinList = \"$pinlist\";\n");
+    $self->printUno("PinList = \"$pinlist\";\n");
 
     #print $uno "CaptureRef MipiCapture = \"DATA_pin\";\n";
     #print $uno "RegSendRef MipiSend = \"DATA_pin+FX_TRIGGER_pin\";\n";
@@ -286,9 +281,9 @@ method regWriteRead256Bytes ($reg)
 
 =cut
 
-fun printVectors (ArrayRef $ref)
+method printVectors (ArrayRef $ref)
 {
-    printVector($_) for @$ref;
+    $self->printVector($_) for @$ref;
 }
 
 =head2 printVector
@@ -297,10 +292,10 @@ fun printVectors (ArrayRef $ref)
 
 =cut
 
-fun printVector (Str $vector)
+method printVector (Str $vector)
 {
-    say $uno $vector;
-    ++$cycle_count;
+    my $fh = $self->{'fh'};
+    say $fh $vector;
 }
 
 =head2 printUno
@@ -309,9 +304,10 @@ fun printVector (Str $vector)
 
 =cut
 
-fun printUno (Str $str)
+method printUno (Str $str)
 {
-    say $uno $str;
+    my $fh = $self->{'fh'};
+    say $fh $str;
 }
 
 =head2 replace01withLH
@@ -338,9 +334,9 @@ fun replace01withLH (ArrayRef $dataref, Int $start, Int $len)
 method getTimeSetArray (Int $read)
 {
     my $bits = 3 + 23 + $read;
-    my @tset = ($tsetWrite) x $bits;
+    my @tset = ( $self->{'tsetWrite'} ) x $bits;
 
-    splice @tset, 17, 9, ($tsetRead) x 9 if $read;
+    splice @tset, 17, 9, ( $self->{'tsetRead'} ) x 9 if $read;
     return @tset;
 }
 
@@ -462,7 +458,7 @@ method regRW ( Str $reg, $read)
         $vec .= "\"$comment[$i]\"";
         push @vec, $vec;
     }
-    &printVectors( \@vec );
+    $self->printVectors( \@vec );
 }
 
 =head2 setPinName
@@ -560,17 +556,6 @@ method getPinList ()
     return @pins;
 }
 
-=head2 BUILD
-
- called after constructor by Moose
-
-=cut
-
-method BUILD ($var)
-{
-    $self->setPinName( "CLK_pin", "DATA_pin" );
-}
-
 =head2 gen
 
  generate Unison pattern file from pseudo directive with new syntax.
@@ -582,13 +567,13 @@ method gen (Str $file)
     &validateInputFile($file);
     my @ins = $self->parsePseudoPattern($file);
 
-    &openUnoFile($file);
+    $self->openUnoFile($file);
 
     $self->printHeader($file);
 
     $self->writeVectors( \@ins );
 
-    &closeUnoFile();
+    $self->closeUnoFile();
 }
 
 =head2 writeVectors
@@ -599,7 +584,7 @@ method writeVectors (ArrayRef $ref)
 {
     for (@$ref) {
         if (/^Label:\s*(\w+)/) {    # label
-            &printUno("\$$1");
+            $self->printUno("\$$1");
         } elsif (/wait\s*(\d+)*/i) {
             my $ins = $1 ? "<RPT $1>" : "";
             $self->printDataInsComment( $self->getIdleVectorData, $ins,
@@ -624,7 +609,7 @@ method writeVectors (ArrayRef $ref)
 
 =cut
 
-method printDataInsComment (Str $data, Str $ins, Str $cmt, Str $tset = $tsetWrite)
+method printDataInsComment (Str $data, Str $ins, Str $cmt, Str $tset = $self->{'tsetWrite'})
 {
     my $str = join( '', '*', $data, '* ', $tset, '; ', $ins );
     my $num = $self->getPinList() + 30;
@@ -632,7 +617,7 @@ method printDataInsComment (Str $data, Str $ins, Str $cmt, Str $tset = $tsetWrit
     $str .= ' "' . $cmt . '"';
 
     #&printUno(join('', '*', $data, '* ', $tset, '; ', $ins, ' "', $cmt, '"'));
-    &printUno($str);
+    $self->printUno($str);
 }
 
 =head2 getVectorData
@@ -698,7 +683,7 @@ method printVectorData (ArrayRef $dataref, ArrayRef $tsetref, ArrayRef $cmtref)
         my $data = join '', @{ $dataref->[$i] };
         my $str  = sprintf( "*%s* %s; %-18s \"%s\"",
             $data, $tsetref->[$i], "", $cmtref->[$i] );
-        printUno($str);
+        $self->printUno($str);
     }
 }
 
