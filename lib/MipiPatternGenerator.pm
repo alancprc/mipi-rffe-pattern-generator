@@ -650,30 +650,37 @@ method getVectorData (Str $ins, Int $read)
 
     # lookup registers
     my @vecs;
-    my @comment;
-    my @tset;
+    my @tsets;
+    my @comments;
     for my $dut ( 0 .. $self->dutNum - 1 ) {
         if ( $ins[$dut] eq "nop" ) {
-            $vecs[ 2 * $dut ] = ["0"];
+            $vecs[ 2 * $dut ]     = ["0"];
             $vecs[ 2 * $dut + 1 ] = ["0"];
+            $tsets[$dut]          = [];
+            $comments[$dut]       = [];
             next;
         }
 
         my @regs = $self->lookupRegisters( $ins[$dut], $dut );
         my @clock;
         my @data;
+        my @tset;
+        my @cmt;
         for my $reg (@regs) {
             push @clock, &getClockArray($read);
             push @data, &getDataArray( $reg, $read );
-            if ( $dut == 0 ) {
-                push @comment, &getCommentArray( $read, $reg );
-                push @tset, $self->getTimeSetArray($read);
-            }
+            push @cmt, &getCommentArray( $read, join( ":", $ins[$dut], $reg ) );
+            push @tset, $self->getTimeSetArray($read);
         }
-        $vecs[ 2 * $dut ] = \@clock;
+
+        $vecs[ 2 * $dut ]     = \@clock;
         $vecs[ 2 * $dut + 1 ] = \@data;
+        $tsets[$dut]          = \@tset;
+        $comments[$dut]       = \@cmt;
     }
     &alignVectorData( \@vecs );
+    my @tset    = &alignTimeSet( \@tsets );
+    my @comment = &mergeComment( \@comments );
     &transposeVectorData( \@vecs );
     $self->addTriggerPinData( \@vecs );
     $self->addExtraPinData( \@vecs );
@@ -740,6 +747,56 @@ fun alignVectorData (ArrayRef $ref)
             push @{$_}, "0";
         }
     }
+}
+
+=head2 alignTimeSet
+
+=cut
+
+fun alignTimeSet ( ArrayRef $ref )
+{
+    my $maxlen = 0;
+    my $maxidx = 0;
+    my $i      = 0;
+    for (@$ref) {
+        my $len = @{$_};
+        if ( $len > $maxlen ) {
+            $maxlen = $len;
+            $maxidx = $i;
+        }
+        ++$i;
+    }
+    return @{ $ref->[$maxidx] };
+}
+
+=head2 mergeComment
+
+=cut
+
+fun mergeComment (ArrayRef $ref)
+{
+    my $maxlen = 0;
+    my $maxidx = 0;
+    for my $i ( 0 .. $#$ref ) {
+        my $len = @{ $ref->[$i] };
+        if ( $len > $maxlen ) {
+            $maxlen = $len;
+            $maxidx = $i;
+        }
+    }
+
+    my @merge;
+    for my $i ( 0 .. $maxlen ) {
+        my $str = '';
+        for my $d ( 0 .. $#$ref ) {
+            if ( $ref->[$d][$i] and $ref->[$d][$i] ne $str ) {
+                my $new = $ref->[$d][$i];
+                $str = $str ? join( ', ', $str, $new ) : $new;
+            }
+        }
+        $merge[$i] = $str;
+    }
+    return @merge;
 }
 
 =head2 transposeVectorData

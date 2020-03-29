@@ -42,7 +42,7 @@ ExtraPinName: vramp=0,dummy=1
 RegisterTable: t/reg_sample.csv, t/reg_sample.csv
 
 Label: test
-    LB_GMSK_HPM, L_TRX1
+    Isolation, LB_GMSK_HPM
     wait 
     trig
     wait 577
