@@ -238,6 +238,7 @@ sub parsePseudoPatternLegacy
     close $fh;
 
     chomp @data;
+    s/\R//g for @data;
 
     return @data;
 }
@@ -656,17 +657,17 @@ sub writeVectors
     for (@$ref) {
         if (/^Label:\s*(\w+)/) {    # label
             $self->printUno("\$$1");
-        } elsif (/wait\s*(\d+)*/i) {
+        } elsif (/^\s*wait\s*(\d+)*/i) {
             my $ins = $1 ? "<RPT $1>" : "";
             $self->printDataInsComment( $self->getIdleVectorData, $ins,
                 "wait" );
-        } elsif (/stop/i) {
+        } elsif (/^\s*stop/i) {
             $self->printDataInsComment( $self->getIdleVectorData, "<STOP>",
                 "stop" );
-        } elsif (/jmp\s+(\w+)/i) {
+        } elsif (/^\s*jmp\s+(\w+)/i) {
             $self->printDataInsComment( $self->getIdleVectorData, "<JMP $1>",
                 "jump" );
-        } elsif (/trig/i) {
+        } elsif (/^\s*trig/i) {
             $self->printDataInsComment( $self->getIdleVectorData(1),
                 "[TRIG]", "trigger" );
         } elsif (/^(R:)?\s*(\w+\s*(?:,\s*\w+)*)/) {
@@ -926,7 +927,8 @@ sub readRegisterTable
         close $fh;
 
         # remove trailing new line
-        s/\R// for @content;
+        chomp @content;
+        s/\R//g for @content;
 
         my @addr = split /,/, shift @content;
         shift @addr;
@@ -982,6 +984,9 @@ sub parsePseudoPattern
     close $fh;
 
     chomp @data;
+    s/\R//g for @data;
+
+    @data = grep !/^\s*#|^\s*$/, @data;
     die "$file is empty!" unless @data;
 
     # dut number

@@ -34,12 +34,28 @@ print $fh $reg;
 close $fh;
 
 my $txt = <<EOF;
+# the number of device. should be successive and start from 1.
 DUT: 1, 2
+
+# the name for clock pin for each device.
 ClockPinName: clk1, clk2
+
+# the name for data pin for each device.
 DataPinName: data1, data2
+
+# the name for trigger pin. leave blank if no trigger pin needed.
 TriggerPinName: fx_trigger
+
+# the name for extra pins, separated by ',' for multiple pin.
+# leave blank if no extra pins needed.
+# the format is: <pin name>=<default logic state>
+# e.g.: 'vramp=1' will add pin "vramp" to uno pattern, with logic state '1';
 ExtraPinName: vramp=0,dummy=1
+
+# the csv file name for each device.
 RegisterTable: t/reg_sample.csv, t/reg_sample.csv
+
+# do NOT delete or change the order of setting lines above.
 
 Label: test
     Isolation, LB_GMSK_HPM
