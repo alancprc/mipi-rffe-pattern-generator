@@ -1,4 +1,0 @@
-write
-0xE1C38W
-0xF1C38W
-wait

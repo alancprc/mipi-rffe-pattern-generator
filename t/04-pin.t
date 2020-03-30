@@ -10,6 +10,18 @@ BEGIN {
 
 use MipiPatternGenerator;
 
+# generate test file
+my $pin = <<EOF;
+write
+0xE1C38W
+0xF1C38W
+wait
+EOF
+
+open my $fh, ">", "t/pin.txt";
+print $fh $pin;
+close $fh;
+
 # generate
 my $mipi = MipiPatternGenerator->new();
 
@@ -17,11 +29,11 @@ $mipi->setPinName( "data", "clk" );
 $mipi->addTriggerPin("fx_trigger");
 $mipi->addExtraPin( "vramp", "0" );
 
-$mipi->generate("t/sample.txt");
+$mipi->generate("t/pin.txt");
 
-ok( -e "t/sample.uno" );
+ok( -e "t/pin.uno" );
 
-open my $fh, "<", "t/sample.uno";
+open $fh, "<", "t/pin.uno";
 my @file = <$fh>;
 close $fh;
 
@@ -36,6 +48,10 @@ ok( grep /data/,       @pins, "data pin" );
 ok( grep /clk/,        @pins, "clodk pin" );
 ok( grep /fx_trigger/, @pins, "trigger pin" );
 ok( grep /vramp/,      @pins, "trigger pin" );
+
+# clean
+unlink "t/pin.txt";
+unlink "t/pin.uno";
 
 done_testing();
 

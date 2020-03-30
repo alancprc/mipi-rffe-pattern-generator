@@ -10,16 +10,26 @@ BEGIN {
 
 use MipiPatternGenerator;
 
+# generate test file
+my $pattern = <<EOF;
+write
+0xE1C38W
+0xF1C38W
+wait
+EOF
+
+open my $fh, ">", "t/pattern.txt";
+print $fh $pattern;
+close $fh;
+
 # generate
 my $mipi = MipiPatternGenerator->new();
-$mipi->generate("t/sample.txt");
+$mipi->generate("t/pattern.txt");
 
-my $file = 0;
-$file = 1 if -e "t/sample.uno";
+ok( -e "t/pattern.uno", "pattern.uno generated" );
 
-ok( $file, "sample.uno generated" );
-
-open my $fh, "<", "t/sample.uno";
+# test output file
+open $fh, "<", "t/pattern.uno";
 my @content = <$fh>;
 close $fh;
 
@@ -27,15 +37,17 @@ my @name = grep /^Pattern\s/, @content;
 
 ok( @name, "Pattern line" );
 
-$name[0] =~ m/^Pattern\s+(\S+)/;
-
-is( $1, "sample", "pattern name" );
+like( $name[0], qr/^Pattern\s+pattern/, "pattern name" );
 
 my $vector = grep /^\s*\*(\s*\w\s*)+\*(\s*\w\s*)+;/, @content;
-ok( $vector > 25, "vector test" );
+ok( $vector == 52, "vector number" );
 
 my $end = grep /^\s*}/, @content;
 ok( $end == 1, "pattern end" );
+
+# clean
+unlink "t/pattern.txt";
+unlink "t/pattern.uno";
 
 done_testing();
 
