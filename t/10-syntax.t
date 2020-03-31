@@ -55,6 +55,10 @@ ExtraPinName: vramp=0,dummy=1
 # the csv file name for each device.
 RegisterTable: t/reg_sample.csv, t/reg_sample.csv
 
+# the waveform reference for read/write cycle
+WaveformRefRead: TS13MHz
+WaveformRefWrite: TS26MHz
+
 # do NOT delete or change the order of setting lines above.
 
 Label: test

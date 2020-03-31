@@ -1054,6 +1054,24 @@ sub parsePseudoPattern
     $line =~ s/.*://g;
     my @regtable = split /,/, $line;
     $self->readRegisterTable( \@regtable );
+
+    # waveform ref
+    $line = shift @data;
+    die "missing 'WaveformRefRead:' line in $file."
+      unless $line =~ /^WaveformRefRead:/;
+    $line =~ s/\s//g;
+    $line =~ s/.*://g;
+    my $read = $line;
+
+    $line = shift @data;
+    die "missing 'WaveformRefWrite' line in $file."
+      unless $line =~ /^WaveformRefWrite:/;
+    $line =~ s/\s//g;
+    $line =~ s/.*://g;
+    my $write = $line;
+
+    $self->setTimeSet( $write, $read );
+
     return @data;
 }
 
