@@ -370,7 +370,8 @@ sub getTimeSetArray
 {
     my ( $self, $read ) = @_;
 
-    my $bits = 3 + 23 + $read;
+    # 3 ssc, 23/24 cmd, 1 stop cycle after bus park
+    my $bits = 3 + 23 + $read + 1;
     my @tset = ( $self->{'tsetWrite'} ) x $bits;
 
     splice @tset, 17, 9, ( $self->{'tsetRead'} ) x 9 if $read;
@@ -388,11 +389,13 @@ sub getClockArray
     my ( $read, $reg ) = @_;
     $reg = "" unless $reg;
 
-    return ("0") x ( 23 + $read ) if $reg eq "nop";
+    return ("0") x ( 26 + $read + 1 ) if $reg eq "nop";
 
     my $ones  = 23 + $read;
     my $zeros = 3;
-    my $str   = "0" x $zeros . '1' x $ones;
+
+    # 3 ssc, 23/24 cmd, 1 stop cycle after bus park
+    my $str   = "0" x $zeros . '1' x $ones . '0';
     return split //, $str;
 }
 
@@ -406,7 +409,8 @@ sub getDataArray
 {
     my ( $reg, $read ) = @_;
 
-    return ("0") x ( 23 + $read ) if $reg eq "nop";
+    # 3 ssc, 23/24 cmd, 1 stop cycle after bus park
+    return ("0") x ( 26 + $read + 1 ) if $reg eq "nop";
 
     my @data = split //, sprintf( "%020b", hex($reg) );
 
@@ -430,6 +434,9 @@ sub getDataArray
 
     # add parity for cmd
     splice @data, 15, 0, oddParity( @data[ 3 .. 14 ] );
+
+    # add extra idle after bus park
+    push @data, 0;
 
     return @data;
 }
@@ -456,6 +463,9 @@ sub getCommentArray
           Data7 Data6 Data5 Data4 Data3 Data2 Data1 Data0 Parity2 BusPark);
     }
     $comment[0] .= " $reg" if $reg;
+
+    # add comment for stop cycle after bus park
+    push @comment, "";
 
     return @comment;
 }

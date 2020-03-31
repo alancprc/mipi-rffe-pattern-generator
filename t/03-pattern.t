@@ -40,7 +40,7 @@ ok( @name, "Pattern line" );
 like( $name[0], qr/^Pattern\s+pattern/, "pattern name" );
 
 my $vector = grep /^\s*\*(\s*\w\s*)+\*(\s*\w\s*)+;/, @content;
-ok( $vector == 52, "vector number" );
+is( $vector, 54, "vector number" );
 
 my $end = grep /^\s*}/, @content;
 ok( $end == 1, "pattern end" );

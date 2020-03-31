@@ -83,7 +83,7 @@ close $fh;
 
 # vector number test
 my $vectors = grep /^\*/, @content;
-is( $vectors, 188, "vector number" );
+is( $vectors, 195, "vector number" );
 
 # pattern end
 my $end = grep /^\s*}/, @content;
