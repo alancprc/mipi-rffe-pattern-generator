@@ -369,7 +369,17 @@ sub replace01withLH
 
 sub getTimeSetArray
 {
-    my ( $self, $read ) = @_;
+    my ( $self, $read, $ext ) = @_;
+
+    if ( $ext ) {
+
+        # 3 ssc, 23/24 cmd, 1 stop cycle after bus park
+        my $bits = 35 + $read + 1;
+        my @tset = ( $self->{'tsetWrite'} ) x $bits;
+
+        splice @tset, 25, 10, ( $self->{'tsetRead'} ) x 10 if $read;
+        return @tset;
+    }
 
     # 3 ssc, 23/24 cmd, 1 stop cycle after bus park
     my $bits = 3 + 23 + $read + 1;
@@ -387,16 +397,17 @@ sub getTimeSetArray
 
 sub getClockArray
 {
-    my ( $read, $reg ) = @_;
+    my ( $read, $reg, $ext ) = @_;
     $reg = "" unless $reg;
+    my $numZero = 3;
+    my $numOne = 23;
+    my $numIdle = 1;
 
-    return ("0") x ( 26 + $read + 1 ) if $reg eq "nop";
+    $numOne = 32 if $ext;
 
-    my $ones  = 23 + $read;
-    my $zeros = 3;
+    return ("0") x ( $numZero + $numOne + $read + $numIdle ) if $reg eq "nop";
 
-    # 3 ssc, 23/24 cmd, 1 stop cycle after bus park
-    my $str = "0" x $zeros . '1' x $ones . '0';
+    my $str = "0" x $numZero . '1' x ( $numOne + $read ) . '0';
     return split //, $str;
 }
 
@@ -408,38 +419,82 @@ sub getClockArray
 
 sub getDataArray
 {
-    my ( $reg, $read ) = @_;
+    my ( $reg, $read, $ext ) = @_;
 
-    # 3 ssc, 23/24 cmd, 1 stop cycle after bus park
-    return ("0") x ( 26 + $read + 1 ) if $reg eq "nop";
+    return &getClockArray( $read, $reg, $ext ) if $reg eq "nop";
 
-    my @data = split //, sprintf( "%020b", hex($reg) );
+    my @bits = split //, sprintf( "%020b", hex($reg) );
+    my @sa   = @bits[ 0 .. 3 ];
+    my @addr = @bits[ 4 .. 11 ];
+    my @data = @bits[ 12 .. 19 ];
+    my @result;
 
-    # set read/write cmd
-    splice @data, 4, 3, ( 0, 1, $read );
+    # SSC
+    @result[ 0 .. 2 ] = qw(0 1 0);
 
-    # add parity for data
-    push @data, oddParity( @data[ 12 .. 19 ] );
+    # SA
+    @result[ 3 .. 6 ] = @sa;
+
+    if ($ext) {
+
+        # CMD
+        @result[ 7 .. 10 ] = ( 0, 0, $read, 0 );
+
+        # BC
+        @result[11 .. 14] = ( 0, 0, 0, 1);
+
+        # parity for cmd
+        $result[15] = oddParity( @result[ 3 .. 14 ] );
+
+        # Addr
+        @result[16..23] = @addr;
+        $result[24] =  oddParity( @addr );
+
+        # Data
+        @result[25.. 32] = @data;
+        $result[33] =  oddParity( @data );
+
+        # replace data and parity with expected logic if read
+        &replace01withLH( \@result, 25, 9 ) if $read;
+
+        # add bus park
+        push @result, 0;
+
+        # add extra idle after bus park
+        push @result, 0;
+
+        # bus park if read
+        splice @result, 25, 0, 0 if $read;
+
+        return @result;
+    }
+
+    # CMD
+    @result[ 7 .. 9 ] = ( 0, 1, $read );
+
+    # Addr
+    @result[ 10 .. 14 ] = @addr[ 3 .. 7 ];
+
+    # parity for cmd
+    $result[15] = oddParity( @result[ 3 .. 14 ] );
+
+    # Data
+    @result[16.. 23] = @data;
+    $result[24] =  oddParity( @data );
 
     # replace data and parity with expected logic if read
-    &replace01withLH( \@data, 12, 9 ) if $read;
+    &replace01withLH( \@result, 16, 9 ) if $read;
 
     # add bus park
-    push @data, 0;
-
-    # bus park if read
-    splice @data, 12, 0, 0 if $read;
-
-    # add sequence start condition
-    unshift @data, qw(0 1 0);
-
-    # add parity for cmd
-    splice @data, 15, 0, oddParity( @data[ 3 .. 14 ] );
+    push @result, 0;
 
     # add extra idle after bus park
-    push @data, 0;
+    push @result, 0;
 
-    return @data;
+    # bus park if read
+    splice @result, 16, 0, 0 if $read;
+
+    return @result;
 }
 
 =head2 getCommentArray
@@ -448,20 +503,30 @@ sub getDataArray
 
 sub getCommentArray
 {
-    my ( $read, $reg ) = @_;
+    my ( $read, $reg, $ext ) = @_;
     $reg = "" unless $reg;
 
     my @comment;
-    if ($read) {
-        @comment = qw( SSC SSC SSC SlaveAddr3 SlaveAddr2 SlaveAddr1 SlaveAddr0
-          Command2 Command1 Command0
-          DataAddr4 DataAddr3 DataAddr2 DataAddr1 DataAddr0 Parity1 BusPark
-          Data7 Data6 Data5 Data4 Data3 Data2 Data1 Data0 Parity2 BusPark);
+    if ($ext) {
+        @comment = qw(
+          SSC SSC SSC
+          SlaveAddr3 SlaveAddr2 SlaveAddr1 SlaveAddr0
+          Command3 Command2 Command1 Command0
+          ByteCount3 ByteCount2 ByteCount1 ByteCount0
+          ParityCmd
+          DataAddr7 DataAddr6 DataAddr5 DataAddr4
+          DataAddr3 DataAddr2 DataAddr1 DataAddr0
+          ParityAddr
+          Data7 Data6 Data5 Data4 Data3 Data2 Data1 Data0
+          ParityData BusPark);
+        splice @comment, 25, 0, "BusPark" if $read;
     } else {
-        @comment = qw( SSC SSC SSC SlaveAddr3 SlaveAddr2 SlaveAddr1 SlaveAddr0
+        @comment = qw(
+          SSC SSC SSC SlaveAddr3 SlaveAddr2 SlaveAddr1 SlaveAddr0
           Command2 Command1 Command0
           DataAddr4 DataAddr3 DataAddr2 DataAddr1 DataAddr0 Parity1
           Data7 Data6 Data5 Data4 Data3 Data2 Data1 Data0 Parity2 BusPark);
+        splice @comment, 16, 0, "BusPark" if $read;
     }
     $comment[0] .= " $reg" if $reg;
 
@@ -745,11 +810,12 @@ sub writeSingleRegister
 
     my @vecs;
     my @cmt;
+    my $extended = grep { &isExtended($_) } @$regref;
     for my $dut ( 0 .. $self->dutNum - 1 ) {
         my $reg = $regref->[$dut];
 
-        my @clock = &getClockArray( $read, $reg );
-        my @data  = &getDataArray( $reg, $read );
+        my @clock = &getClockArray( $read, $reg, $extended );
+        my @data  = &getDataArray( $reg, $read, $extended );
 
         $vecs[ 2 * $dut ] = \@clock;
         $vecs[ 2 * $dut + 1 ] = \@data;
@@ -757,8 +823,8 @@ sub writeSingleRegister
         $cmt[$dut] =
           sprintf( "%d:%s:%s", $dut + 1, $insref->[$dut], $regref->[$dut] );
     }
-    my @tset    = $self->getTimeSetArray($read);
-    my @comment = &getCommentArray( $read, "@cmt" );
+    my @tset    = $self->getTimeSetArray($read, $extended);
+    my @comment = &getCommentArray( $read, "@cmt", $extended );
 
     &transposeArrayOfArray( \@vecs );
     $self->addTriggerPinData( \@vecs );
@@ -1070,6 +1136,17 @@ sub parsePseudoPattern
     $self->setTimeSet( $write, $read );
 
     return @data;
+}
+
+=head2 isExtended
+
+=cut
+
+sub isExtended
+{
+    my $reg = shift;
+    return 1 if $reg =~ /0x\w[A-F2-9]\w{3,3}/i;
+    return 0;
 }
 
 =head1 AUTHOR
