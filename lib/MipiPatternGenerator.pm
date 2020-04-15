@@ -6,6 +6,7 @@ use warnings;
 
 use File::Basename;
 use File::Spec;
+use List::Util qw(max min);
 
 use Exporter qw(import);
 our @EXPORT = qw();
@@ -395,7 +396,7 @@ sub getClockArray
     my $zeros = 3;
 
     # 3 ssc, 23/24 cmd, 1 stop cycle after bus park
-    my $str   = "0" x $zeros . '1' x $ones . '0';
+    my $str = "0" x $zeros . '1' x $ones . '0';
     return split //, $str;
 }
 
@@ -682,7 +683,7 @@ sub writeVectors
                 "[TRIG]", "trigger" );
         } elsif (/^(R:)?\s*(\w+\s*(?:,\s*\w+)*)/) {
             my $read = $1 ? 1 : 0;
-            $self->getVectorData( $2, $read );    # read/write
+            $self->writeSingleInstruction( $2, $read );    # read/write
         }
     }
 }
@@ -701,17 +702,16 @@ sub printDataInsComment
     $str = sprintf( "%-${num}s", $str );
     $str .= ' "' . $cmt . '"';
 
-    #&printUno(join('', '*', $data, '* ', $tset, '; ', $ins, ' "', $cmt, '"'));
     $self->printUno($str);
 }
 
-=head2 getVectorData
+=head2 writeSingleInstruction
 
  write read/write mipi operation segment into pattern file
 
 =cut
 
-sub getVectorData
+sub writeSingleInstruction
 {
     my ( $self, $ins, $read ) = @_;
 
@@ -724,32 +724,43 @@ sub getVectorData
         push @ins, "nop";
     }
 
-    # lookup registers
-    my @vecs;
-    my @tsets;
-    my @comments;
-    for my $dut ( 0 .. $self->dutNum - 1 ) {
-        my @regs = $self->lookupRegisters( $ins[$dut], $dut );
-        my @clock;
-        my @data;
-        my @tset;
-        my @cmt;
-        for my $reg (@regs) {
-            push @clock, &getClockArray( $read, $reg );
-            push @data, &getDataArray( $reg, $read );
-            push @tset, $self->getTimeSetArray($read);
-            push @cmt, &getCommentArray( $read, join( ":", $ins[$dut], $reg ) );
-        }
+    my @registers = $self->translateInsToRegs(@ins);
 
-        $vecs[ 2 * $dut ]     = \@clock;
-        $vecs[ 2 * $dut + 1 ] = \@data;
-        $tsets[$dut]          = \@tset;
-        $comments[$dut]       = \@cmt;
+    &alignRegWithNop( \@registers );
+
+    &transposeArrayOfArray( \@registers );
+
+    for my $reg (@registers) {
+        $self->writeSingleRegister( $reg, \@ins, $read );
     }
-    &alignVectorData( \@vecs );
-    my @tset    = &alignTimeSet( \@tsets );
-    my @comment = &mergeComment( \@comments );
-    &transposeVectorData( \@vecs );
+}
+
+=head2 writeSingleRegister
+
+=cut
+
+sub writeSingleRegister
+{
+    my ( $self, $regref, $insref, $read ) = @_;
+
+    my @vecs;
+    my @cmt;
+    for my $dut ( 0 .. $self->dutNum - 1 ) {
+        my $reg = $regref->[$dut];
+
+        my @clock = &getClockArray( $read, $reg );
+        my @data  = &getDataArray( $reg, $read );
+
+        $vecs[ 2 * $dut ] = \@clock;
+        $vecs[ 2 * $dut + 1 ] = \@data;
+
+        $cmt[$dut] =
+          sprintf( "%d:%s:%s", $dut + 1, $insref->[$dut], $regref->[$dut] );
+    }
+    my @tset    = $self->getTimeSetArray($read);
+    my @comment = &getCommentArray( $read, "@cmt" );
+
+    &transposeArrayOfArray( \@vecs );
     $self->addTriggerPinData( \@vecs );
     $self->addExtraPinData( \@vecs );
     $self->printVectorData( \@vecs, \@tset, \@comment );
@@ -804,24 +815,24 @@ sub addExtraPinData
     }
 }
 
-=head2 alignVectorData
+=head2 alignRegWithNop
+
+ if the number of register among devices is not equal, make them equal by
+ padding "nop".
 
 =cut
 
-sub alignVectorData
+sub alignRegWithNop
 {
     my $ref = shift;
 
     # get max length
-    my $maxlen = 0;
+    my @length = map { scalar @{$_} } @$ref;
+    my $maxlen = max(@length);
+
+    # pad to max length
     for (@$ref) {
-        my $len = @{$_};
-        $maxlen = $len > $maxlen ? $len : $maxlen;
-    }
-    for (@$ref) {
-        while ( @{$_} < $maxlen ) {
-            push @{$_}, "0";
-        }
+        push @{$_}, ("nop") x ( $maxlen - @{$_} );
     }
 }
 
@@ -847,45 +858,13 @@ sub alignTimeSet
     return @{ $ref->[$maxidx] };
 }
 
-=head2 mergeComment
-
-=cut
-
-sub mergeComment
-{
-    my $ref = shift;
-
-    my $maxlen = 0;
-    my $maxidx = 0;
-    for my $i ( 0 .. $#$ref ) {
-        my $len = @{ $ref->[$i] };
-        if ( $len > $maxlen ) {
-            $maxlen = $len;
-            $maxidx = $i;
-        }
-    }
-
-    my @merge;
-    for my $i ( 0 .. $maxlen ) {
-        my $str = '';
-        for my $d ( 0 .. $#$ref ) {
-            if ( $ref->[$d][$i] and $ref->[$d][$i] ne $str ) {
-                my $new = $ref->[$d][$i];
-                $str = $str ? join( ', ', $str, $new ) : $new;
-            }
-        }
-        $merge[$i] = $str;
-    }
-    return @merge;
-}
-
-=head2 transposeVectorData
+=head2 transposeArrayOfArray
 
  transpose array of columns to array of rows
 
 =cut
 
-sub transposeVectorData
+sub transposeArrayOfArray
 {
     my $ref = shift;
 
@@ -896,6 +875,24 @@ sub transposeVectorData
         }
     }
     @$ref = @new;
+}
+
+=head2 translateInsToRegs
+
+ translate instruction to array of registers of all devices
+
+=cut
+
+sub translateInsToRegs
+{
+    my $self = shift;
+    my @ins  = @_;
+    my @registers;
+    for my $dut ( 0 .. $self->dutNum - 1 ) {
+        my @tmp = $self->lookupRegisters( $ins[$dut], $dut );
+        $registers[$dut] = \@tmp;
+    }
+    return @registers;
 }
 
 =head2 lookupRegisters
