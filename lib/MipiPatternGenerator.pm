@@ -441,7 +441,7 @@ sub getDataArray
         @result[ 7 .. 10 ] = ( 0, 0, $read, 0 );
 
         # BC
-        @result[11 .. 14] = ( 0, 0, 0, 1);
+        @result[11 .. 14] = ( 0, 0, 0, 0);
 
         # parity for cmd
         $result[15] = oddParity( @result[ 3 .. 14 ] );

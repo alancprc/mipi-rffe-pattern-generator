@@ -67,11 +67,11 @@ is( &MipiPatternGenerator::isExtended("0xE1C38"), 0, "extended mode check" );
 # get data
 {
     my @data = MipiPatternGenerator::getDataArray( "0xE2C38", 0, 1);
-    my $exp = "010111000000001100101100000111000000";
+    my $exp = "010111000000000000101100000111000000";
     is( join( "", @data ), $exp, "extended write data bits");
 
     @data = MipiPatternGenerator::getDataArray( "0xE2C47", 1, 1 );
-    $exp = "01011100010000100010110000LHLLLHHHH00";
+    $exp = "01011100010000010010110000LHLLLHHHH00";
     is( join( "", @data ), $exp, "extended read data bits" );
 }
 
