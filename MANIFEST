@@ -8,6 +8,7 @@ t/01-funcs.t
 t/03-pattern.t
 t/04-pin.t
 t/10-syntax.t
+t/20-extended-mode.t
 t/manifest.t
 t/pod-coverage.t
 t/pod.t
