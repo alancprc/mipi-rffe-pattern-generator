@@ -744,8 +744,7 @@ sub writeVectors
             $self->printDataInsComment( $self->getIdleVectorData, "<JMP $1>",
                 "jump" );
         } elsif (/^\s*trig/i) {
-            $self->printDataInsComment( $self->getIdleVectorData(1),
-                "[TRIG]", "trigger" );
+            $self->printTriggerVector();
         } elsif (/^(R:)?\s*(\w+\s*(?:,\s*\w+)*)/) {
             my $read = $1 ? 1 : 0;
             $self->writeSingleInstruction( $2, $read );    # read/write
@@ -1147,6 +1146,19 @@ sub isExtended
     my $reg = shift;
     return 1 if $reg =~ /0x\w[A-F2-9]\w{3,3}/i;
     return 0;
+}
+
+=head2 printTriggerVector
+
+=cut
+
+sub printTriggerVector
+{
+    my $self = shift;
+    my $ins  = "";
+
+    $ins = "[TRIG]" unless $self->getTriggerPin();
+    $self->printDataInsComment( $self->getIdleVectorData(1), $ins, "trigger" );
 }
 
 =head1 AUTHOR
