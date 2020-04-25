@@ -164,7 +164,7 @@ sub openUnoFile
     my $fn = $file;
     $fn =~ s/(.*)\.\w+/$1.uno/;
 
-    open( my $fh, ">", $fn ) or die "$!";
+    open( my $fh, ">", $fn ) or die "fail to open $fn for write: $!";
     $self->{'fh'} = $fh;
 }
 
@@ -234,7 +234,8 @@ sub parsePseudoPatternLegacy
 {
     my $inputfile = shift;
 
-    open( my $fh, "<", $inputfile ) or die "$!";
+    open( my $fh, "<", $inputfile )
+      or die "fail to open $inputfile for read: $!";
     my @data = <$fh>;
     close $fh;
 
@@ -371,7 +372,7 @@ sub getTimeSetArray
 {
     my ( $self, $read, $ext ) = @_;
 
-    if ( $ext ) {
+    if ($ext) {
 
         # 3 ssc, 23/24 cmd, 1 stop cycle after bus park
         my $bits = 35 + $read + 1;
@@ -400,7 +401,7 @@ sub getClockArray
     my ( $read, $reg, $ext ) = @_;
     $reg = "" unless $reg;
     my $numZero = 3;
-    my $numOne = 23;
+    my $numOne  = 23;
     my $numIdle = 1;
 
     $numOne = 32 if $ext;
@@ -441,18 +442,18 @@ sub getDataArray
         @result[ 7 .. 10 ] = ( 0, 0, $read, 0 );
 
         # BC
-        @result[11 .. 14] = ( 0, 0, 0, 0);
+        @result[ 11 .. 14 ] = ( 0, 0, 0, 0 );
 
         # parity for cmd
         $result[15] = oddParity( @result[ 3 .. 14 ] );
 
         # Addr
-        @result[16..23] = @addr;
-        $result[24] =  oddParity( @addr );
+        @result[ 16 .. 23 ] = @addr;
+        $result[24] = oddParity(@addr);
 
         # Data
-        @result[25.. 32] = @data;
-        $result[33] =  oddParity( @data );
+        @result[ 25 .. 32 ] = @data;
+        $result[33] = oddParity(@data);
 
         # replace data and parity with expected logic if read
         &replace01withLH( \@result, 25, 9 ) if $read;
@@ -479,8 +480,8 @@ sub getDataArray
     $result[15] = oddParity( @result[ 3 .. 14 ] );
 
     # Data
-    @result[16.. 23] = @data;
-    $result[24] =  oddParity( @data );
+    @result[ 16 .. 23 ] = @data;
+    $result[24] = oddParity(@data);
 
     # replace data and parity with expected logic if read
     &replace01withLH( \@result, 16, 9 ) if $read;
@@ -822,7 +823,7 @@ sub writeSingleRegister
         $cmt[$dut] =
           sprintf( "%d:%s:%s", $dut + 1, $insref->[$dut], $regref->[$dut] );
     }
-    my @tset    = $self->getTimeSetArray($read, $extended);
+    my @tset    = $self->getTimeSetArray( $read, $extended );
     my @comment = &getCommentArray( $read, "@cmt", $extended );
 
     &transposeArrayOfArray( \@vecs );
@@ -994,7 +995,8 @@ sub readRegisterTable
       unless $self->dutNum == @$ref;
 
     for my $dut ( 0 .. $self->dutNum - 1 ) {
-        open my $fh, "<", $ref->[$dut] or die "$!";
+        my $fn = $ref->[$dut];
+        open my $fh, "<", $fn or die "fail to open $fn for read: $!";
         my @content = <$fh>;
         close $fh;
 
@@ -1051,7 +1053,7 @@ sub parsePseudoPattern
 {
     my ( $self, $file ) = @_;
 
-    open( my $fh, "<", $file ) or die "$!";
+    open( my $fh, "<", $file ) or die "fail to open $file for read: $!";
     my @data = <$fh>;
     close $fh;
 
