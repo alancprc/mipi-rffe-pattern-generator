@@ -60,8 +60,7 @@ our $VERSION = '0.01';
     use MipiPatternGenerator;
 
     my $mipi = MipiPatternGenerator->new();
-    $mipi->setTimeSet($writeTset, $readTset);
-    $mipi->generate("pattern.txt");
+    $mipi->gen("pattern.txt");
 
 =head1 SUBROUTINES/METHODS
 
@@ -91,40 +90,6 @@ sub dutNum
     my ( $self, $num ) = @_;
     $self->{'dutNum'} = $num if $num;
     return $self->{'dutNum'};
-}
-
-=head2 generate
-
- generate unison pattern file from given pseudo pattern file.
-
-=cut
-
-sub generate
-{
-    my ( $self, $file ) = @_;
-
-    &validateInputFile($file);
-    my @ins = &parsePseudoPatternLegacy($file);
-
-    $self->openUnoFile($file);
-
-    $self->printHeader($file);
-
-    for (@ins) {
-        if (/0x(\S+)W$/) {
-            $self->regWrite($1);
-        } elsif (/0x(\S+)R$/) {
-            $self->regRead($1);
-        } elsif (/0x(\S+)WR256$/) {
-            $self->regWriteRead256Bytes($1);
-        } elsif ( !/wait/ and /^\s*(\w+)\s*$/ ) {
-
-            # label
-            $self->printUno("\$$1");
-        }
-    }
-
-    $self->closeUnoFile();
 }
 
 =head2 setTimeSet
@@ -217,59 +182,6 @@ sub printHeader
     #print $uno "CaptureRef MipiCapture = \"DATA_pin\";\n";
     #print $uno "RegSendRef MipiSend = \"DATA_pin+FX_TRIGGER_pin\";\n";
     #print $uno "SyncRef { PatRfTrig }\n\n";
-
-    #print $uno "Default SignalHeader $pattern_name\_SH;\n";
-    #print $uno "Default WaveformTable $pattern_name\_WFTRef;\n\n";
-
-    #print $uno "\$start\n";
-}
-
-=head2 parsePseudoPatternLegacy
-
- read pseudo pattern file
-
-=cut
-
-sub parsePseudoPatternLegacy
-{
-    my $inputfile = shift;
-
-    open( my $fh, "<", $inputfile )
-      or die "fail to open $inputfile for read: $!";
-    my @data = <$fh>;
-    close $fh;
-
-    chomp @data;
-    s/\R//g for @data;
-
-    return @data;
-}
-
-=head2 regWrite
-
- write data to single register at given address
-
-=cut
-
-sub regWrite
-{
-    my ( $self, $reg ) = @_;
-
-    my $read = 0;
-    return $self->regRW( $reg, $read );
-}
-
-=head2 regRead
-
- read single register data at given address
-
-=cut
-
-sub regRead
-{
-    my ( $self, $reg ) = @_;
-    my $read = 1;
-    return $self->regRW( $reg, $read );
 }
 
 =head2 increaseRegData
@@ -286,25 +198,6 @@ sub increaseRegData
     my $dec = hex($$ref);
     ++$dec;
     $$ref = sprintf( "%X", $dec );
-}
-
-=head2 regWriteRead256Bytes
-
- write data 0x00 to 0xff to a same address and then read back
-
-=cut
-
-sub regWriteRead256Bytes
-{
-    my ( $self, $reg ) = @_;
-
-    $self->regWrite($reg);
-    $self->regRead($reg);
-
-    while ( &increaseRegData( \$reg ) ) {
-        $self->regWrite($reg);
-        $self->regRead($reg);
-    }
 }
 
 =head2 printVectors
@@ -549,43 +442,6 @@ sub oddParity
 
     my $num = grep /1/, @data;
     return ( $num + 1 ) % 2;
-}
-
-=head2 regRW
-
- transform register write/read to unison pattern
-
-=cut
-
-sub regRW
-{
-    my ( $self, $reg, $read ) = @_;
-
-    my @data    = &getDataArray( $reg, $read );
-    my @clock   = &getClockArray($read);
-    my @tset    = $self->getTimeSetArray($read);
-    my @comment = &getCommentArray($read);
-
-    die "clock/data/tset size not match."
-      unless $#data == $#clock and $#data == $#tset;
-
-    # add Read/Write register value to comment
-    my $cmt = $read ? "read" : "write";
-    $comment[0] .= " Start to $cmt $reg";
-
-    my @vec;
-    for my $i ( 0 .. $#data ) {
-        my $vec = '*';
-        $vec .= $data[$i];
-        $vec .= $clock[$i];
-        $vec .= "0";
-        $vec .= '* ';
-        $vec .= $tset[$i];
-        $vec .= '; ';
-        $vec .= "\"$comment[$i]\"";
-        push @vec, $vec;
-    }
-    $self->printVectors( \@vec );
 }
 
 =head2 setPinName

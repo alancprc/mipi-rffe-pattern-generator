@@ -5,8 +5,6 @@ MANIFEST			This list of files
 README
 t/00-load.t
 t/01-funcs.t
-t/03-pattern.t
-t/04-pin.t
 t/10-syntax.t
 t/20-extended-mode.t
 t/manifest.t

@@ -85,6 +85,18 @@ open $fh, "<", "t/syntax.uno";
 my @content = <$fh>;
 close $fh;
 
+# pattern name test
+my @name = grep /^Pattern\s/, @content;
+ok( @name, "Pattern line" );
+like( $name[0], qr/^Pattern\s+syntax/, "pattern name" );
+
+# pin name test
+my @pinlist = grep /PinList/, @content;
+ok( @pinlist, "PinList line" );
+my $pins    = ( split '"', $pinlist[0] )[1];
+my $pinsExp = 'clk1+data1+clk2+data2+fx_trigger+vramp+dummy';
+is( $pins, $pinsExp, "pinlist test" );
+
 # vector number test
 my $vectors = grep /^\*/, @content;
 is( $vectors, 195, "vector number" );
