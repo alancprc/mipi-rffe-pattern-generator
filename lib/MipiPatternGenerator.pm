@@ -4,8 +4,13 @@ use 5.010001;
 use strict;
 use warnings;
 
+use Function::Parameters;
+use Types::Standard qw(Str Int ArrayRef RegexpRef Ref);
+use JSON -convert_blessed_universally;
 use File::Basename;
 use File::Spec;
+use File::Path qw(make_path remove_tree);
+use Carp qw(croak carp);
 use List::Util qw(max min);
 
 use Exporter qw(import);
@@ -72,7 +77,7 @@ our $VERSION = '0.01';
 
 =cut
 
-sub new
+fun new ($var)
 {
     my $self = {};
     bless $self, "MipiPatternGenerator";
@@ -85,9 +90,8 @@ sub new
 
 =cut
 
-sub dutNum
+method dutNum ($num = undef)
 {
-    my ( $self, $num ) = @_;
     $self->{'dutNum'} = $num if $num;
     return $self->{'dutNum'};
 }
@@ -98,10 +102,8 @@ sub dutNum
 
 =cut
 
-sub setTimeSet
+method setTimeSet ($writeTset, $readTset)
 {
-    my ( $self, $writeTset, $readTset ) = @_;
-
     $self->{'tsetWrite'} = $writeTset;
     $self->{'tsetRead'}  = $readTset;
 }
@@ -112,9 +114,8 @@ sub setTimeSet
 
 =cut
 
-sub validateInputFile
+fun validateInputFile (Str $file)
 {
-    my ($file) = @_;
     die "invalid suffix '.uno', please rename the suffix and try again"
       if $file =~ /.*\.uno$/;
 }
@@ -123,9 +124,8 @@ sub validateInputFile
 
 =cut
 
-sub openUnoFile
+method openUnoFile ($file)
 {
-    my ( $self, $file ) = @_;
     my $fn = $file;
     $fn =~ s/(.*)\.\w+/$1.uno/;
 
@@ -137,10 +137,8 @@ sub openUnoFile
 
 =cut
 
-sub closeUnoFile
+method closeUnoFile ()
 {
-    my $self = shift;
-
     $self->printUno("}");
     close $self->{'fh'};
 }
@@ -149,10 +147,8 @@ sub closeUnoFile
 
 =cut
 
-sub getPatternName
+fun getPatternName ($file)
 {
-    my $file = shift;
-
     my $fn = basename($file);
     $fn =~ s/(.*)\.\w+/$1/;
     return $fn;
@@ -164,10 +160,8 @@ sub getPatternName
 
 =cut
 
-sub printHeader
+method printHeader ($file)
 {
-    my ( $self, $file ) = @_;
-
     my $patternName = &getPatternName($file);
 
     $self->printUno("Unison:SyntaxRevision6.310000;");
@@ -190,10 +184,8 @@ sub printHeader
 
 =cut
 
-sub increaseRegData
+fun increaseRegData (Ref $ref)
 {
-    my $ref = shift;
-
     return 0 if $$ref =~ /FF$/i;
     my $dec = hex($$ref);
     ++$dec;
@@ -204,10 +196,8 @@ sub increaseRegData
 
 =cut
 
-sub printVectors
+method printVectors (ArrayRef $ref)
 {
-    my ( $self, $ref ) = @_;
-
     $self->printVector($_) for @$ref;
 }
 
@@ -217,10 +207,8 @@ sub printVectors
 
 =cut
 
-sub printVector
+method printVector (Str $vector)
 {
-    my ( $self, $vector ) = @_;
-
     my $fh = $self->{'fh'};
     say $fh $vector;
 }
@@ -231,10 +219,8 @@ sub printVector
 
 =cut
 
-sub printUno
+method printUno (Str $str)
 {
-    my ( $self, $str ) = @_;
-
     my $fh = $self->{'fh'};
     say $fh $str;
 }
@@ -245,10 +231,8 @@ sub printUno
 
 =cut
 
-sub replace01withLH
+fun replace01withLH (ArrayRef $dataref, Int $start, Int $len)
 {
-    my ( $dataref, $start, $len ) = @_;
-
     for my $idx ( $start .. $start + $len - 1 ) {
         $dataref->[$idx] =~ s/0/L/;
         $dataref->[$idx] =~ s/1/H/;
@@ -261,10 +245,8 @@ sub replace01withLH
 
 =cut
 
-sub getTimeSetArray
+method getTimeSetArray (Int $read, Int $ext = 0)
 {
-    my ( $self, $read, $ext ) = @_;
-
     if ($ext) {
 
         # 3 ssc, 23/24 cmd, 1 stop cycle after bus park
@@ -289,10 +271,8 @@ sub getTimeSetArray
 
 =cut
 
-sub getClockArray
+fun getClockArray (Int $read, Str $reg = "", Int $ext = 0)
 {
-    my ( $read, $reg, $ext ) = @_;
-    $reg = "" unless $reg;
     my $numZero = 3;
     my $numOne  = 23;
     my $numIdle = 1;
@@ -311,10 +291,8 @@ sub getClockArray
 
 =cut
 
-sub getDataArray
+fun getDataArray (Str $reg, Int $read, Int $ext = 0)
 {
-    my ( $reg, $read, $ext ) = @_;
-
     return &getClockArray( $read, $reg, $ext ) if $reg eq "nop";
 
     my @bits = split //, sprintf( "%020b", hex($reg) );
@@ -395,11 +373,8 @@ sub getDataArray
 
 =cut
 
-sub getCommentArray
+fun getCommentArray (Int $read, Str $reg="", Int $ext = 0)
 {
-    my ( $read, $reg, $ext ) = @_;
-    $reg = "" unless $reg;
-
     my @comment;
     if ($ext) {
         @comment = qw(
@@ -436,10 +411,8 @@ sub getCommentArray
 
 =cut
 
-sub oddParity
+fun oddParity (@data)
 {
-    my @data = @_;
-
     my $num = grep /1/, @data;
     return ( $num + 1 ) % 2;
 }
@@ -451,11 +424,8 @@ sub oddParity
 
 =cut
 
-sub setPinName
+method setPinName (Str $clock, Str $data, $dut = 1)
 {
-    my ( $self, $clock, $data, $dut ) = @_;
-    $dut = 1 unless $dut;
-
     $self->{'dut'}->[ $dut - 1 ]->{"clock"} = $clock;
     $self->{'dut'}->[ $dut - 1 ]->{"data"}  = $data;
 }
@@ -467,11 +437,8 @@ sub setPinName
 
 =cut
 
-sub getPinName
+method getPinName ($dut = 1)
 {
-    my ( $self, $dut ) = @_;
-    $dut = 1 unless $dut;
-
     return (
         $self->{'dut'}->[ $dut - 1 ]->{"clock"},
         $self->{'dut'}->[ $dut - 1 ]->{"data"}
@@ -482,10 +449,8 @@ sub getPinName
 
 =cut
 
-sub addTriggerPin
+method addTriggerPin (Str $name)
 {
-    my ( $self, $name ) = @_;
-
     $self->{'trigger'} = $name;
 }
 
@@ -493,10 +458,8 @@ sub addTriggerPin
 
 =cut
 
-sub getTriggerPin
+method getTriggerPin ()
 {
-    my $self = shift;
-
     return $self->{'trigger'} if $self->{'trigger'};
 }
 
@@ -504,10 +467,8 @@ sub getTriggerPin
 
 =cut
 
-sub addExtraPin
+method addExtraPin (Str $name, Str $data)
 {
-    my ( $self, $name, $data ) = @_;
-
     push @{ $self->{'pin'} }, { name => $name, data => $data };
 }
 
@@ -515,10 +476,8 @@ sub addExtraPin
 
 =cut
 
-sub getExtraPins
+method getExtraPins ()
 {
-    my $self = shift;
-
     my @pin;
     for my $ref ( @{ $self->{'pin'} } ) {
         push @pin, $ref->{'name'};
@@ -530,10 +489,8 @@ sub getExtraPins
 
 =cut
 
-sub getDutNum
+method getDutNum ()
 {
-    my $self = shift;
-
     my $num = @{ $self->{'dut'} };
     return $num;
 }
@@ -542,10 +499,8 @@ sub getDutNum
 
 =cut
 
-sub getPinList
+method getPinList ()
 {
-    my $self = shift;
-
     my @pins;
     for my $dut ( @{ $self->{'dut'} } ) {
         push @pins, $dut->{'clock'};
@@ -563,10 +518,8 @@ sub getPinList
 
 =cut
 
-sub gen
+method gen (Str $file)
 {
-    my ( $self, $file ) = @_;
-
     &validateInputFile($file);
     my @ins = $self->parsePseudoPattern($file);
 
@@ -583,10 +536,8 @@ sub gen
 
 =cut
 
-sub writeVectors
+method writeVectors (ArrayRef $ref)
 {
-    my ( $self, $ref ) = @_;
-
     for (@$ref) {
         if (/^Label:\s*(\w+)/) {    # label
             $self->printUno("\$$1");
@@ -613,11 +564,8 @@ sub writeVectors
 
 =cut
 
-sub printDataInsComment
+method printDataInsComment (Str $data, Str $ins, Str $cmt, Str $tset = $self->{'tsetWrite'})
 {
-    my ( $self, $data, $ins, $cmt, $tset ) = @_;
-    $tset = $self->{'tsetWrite'} unless $tset;
-
     my $str = join( '', '*', $data, '* ', $tset, '; ', $ins );
     my $num = $self->getPinList() + 30;
     $str = sprintf( "%-${num}s", $str );
@@ -632,10 +580,8 @@ sub printDataInsComment
 
 =cut
 
-sub writeSingleInstruction
+method writeSingleInstruction (Str $ins, Int $read)
 {
-    my ( $self, $ins, $read ) = @_;
-
     # pading with nop if regs is less than dut number
     $ins =~ s/\s+//g;
     my @ins = split /,/, $ins;
@@ -660,9 +606,8 @@ sub writeSingleInstruction
 
 =cut
 
-sub writeSingleRegister
+method writeSingleRegister ( ArrayRef $regref, ArrayRef $insref, Int $read )
 {
-    my ( $self, $regref, $insref, $read ) = @_;
 
     my @vecs;
     my @cmt;
@@ -697,10 +642,8 @@ sub writeSingleRegister
 
 =cut
 
-sub printVectorData
+method printVectorData (ArrayRef $dataref, ArrayRef $tsetref, ArrayRef $cmtref)
 {
-    my ( $self, $dataref, $tsetref, $cmtref ) = @_;
-
     for my $i ( 0 .. $#$dataref ) {
         my $data = join '', @{ $dataref->[$i] };
         my $str  = sprintf( "*%s* %s; %-18s \"%s\"",
@@ -715,10 +658,8 @@ sub printVectorData
 
 =cut
 
-sub addTriggerPinData
+method addTriggerPinData ($ref)
 {
-    my ( $self, $ref ) = @_;
-
     if ( $self->getTriggerPin() ) {
         push @$_, "0" for @$ref;
     }
@@ -728,10 +669,8 @@ sub addTriggerPinData
 
 =cut
 
-sub addExtraPinData
+method addExtraPinData ($ref)
 {
-    my ( $self, $ref ) = @_;
-
     for my $pin ( @{ $self->{'pin'} } ) {
         push @$_, $pin->{'data'} for @$ref;
     }
@@ -744,10 +683,8 @@ sub addExtraPinData
 
 =cut
 
-sub alignRegWithNop
+fun alignRegWithNop (ArrayRef $ref)
 {
-    my $ref = shift;
-
     # get max length
     my @length = map { scalar @{$_} } @$ref;
     my $maxlen = max(@length);
@@ -762,10 +699,8 @@ sub alignRegWithNop
 
 =cut
 
-sub alignTimeSet
+fun alignTimeSet ( ArrayRef $ref )
 {
-    my $ref = shift;
-
     my $maxlen = 0;
     my $maxidx = 0;
     my $i      = 0;
@@ -786,10 +721,8 @@ sub alignTimeSet
 
 =cut
 
-sub transposeArrayOfArray
+fun transposeArrayOfArray ( ArrayRef $ref )
 {
-    my $ref = shift;
-
     my @new;
     for my $i ( 0 .. $#$ref ) {
         for my $j ( 0 .. $#{ $ref->[0] } ) {
@@ -805,10 +738,8 @@ sub transposeArrayOfArray
 
 =cut
 
-sub translateInsToRegs
+method translateInsToRegs (@ins)
 {
-    my $self = shift;
-    my @ins  = @_;
     my @registers;
     for my $dut ( 0 .. $self->dutNum - 1 ) {
         my @tmp = $self->lookupRegisters( $ins[$dut], $dut );
@@ -827,10 +758,8 @@ sub translateInsToRegs
 
 =cut
 
-sub lookupRegisters
+method lookupRegisters (Str $ins, $dutNum)
 {
-    my ( $self, $ins, $dutNum ) = @_;
-
     return $ins if $ins eq "nop";
     return $ins if $ins =~ /0x\w+/i;
 
@@ -843,10 +772,8 @@ sub lookupRegisters
 
 =cut
 
-sub readRegisterTable
+method readRegisterTable (ArrayRef $ref)
 {
-    my ( $self, $ref ) = @_;
-
     die "RegisterTable file number is not equal to dut number."
       unless $self->dutNum == @$ref;
 
@@ -882,11 +809,8 @@ sub readRegisterTable
 
 =cut
 
-sub getIdleVectorData
+method getIdleVectorData ($trigger=0)
 {
-    my ( $self, $trigger ) = @_;
-    $trigger = 0 unless $trigger;
-
     my $vec;
     $vec .= "00" x $self->dutNum;
     $vec .= $trigger ? "1" : "0" if $self->getTriggerPin();
@@ -905,10 +829,8 @@ sub getIdleVectorData
 
 =cut
 
-sub parsePseudoPattern
+method parsePseudoPattern ($file)
 {
-    my ( $self, $file ) = @_;
-
     open( my $fh, "<", $file ) or die "fail to open $file for read: $!";
     my @data = <$fh>;
     close $fh;
@@ -999,9 +921,8 @@ sub parsePseudoPattern
 
 =cut
 
-sub isExtended
+fun isExtended ( Str $reg )
 {
-    my $reg = shift;
     return 1 if $reg =~ /0x\w[A-F2-9]\w{3,3}/i;
     return 0;
 }
@@ -1010,10 +931,9 @@ sub isExtended
 
 =cut
 
-sub printTriggerVector
+method printTriggerVector ()
 {
-    my $self = shift;
-    my $ins  = "";
+    my $ins = "";
 
     $ins = "[TRIG]" unless $self->getTriggerPin();
     $self->printDataInsComment( $self->getIdleVectorData(1), $ins, "trigger" );
