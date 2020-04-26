@@ -285,13 +285,56 @@ fun getClockArray (Int $read, Str $reg = "", Int $ext = 0)
     return split //, $str;
 }
 
+=head2 getDataArrayReg0
+
+ return data array for register 0 write command
+
+=cut
+
+fun getDataArrayReg0 (Str $reg, $ext)
+{
+    my @bits = split //, sprintf( "%020b", hex($reg) );
+    my @sa   = @bits[ 0 .. 3 ];
+    my @addr = @bits[ 4 .. 11 ];
+    my @data = @bits[ 12 .. 19 ];
+    my @result;
+
+    # SSC
+    @result[ 0 .. 2 ] = qw(0 1 0);
+
+    # SA
+    @result[ 3 .. 6 ] = @sa;
+
+    # CMD
+    $result[7] = 1;
+
+    # Data
+    @result[8 .. 14] = @data[1 .. 7];
+
+    # parity for cmd frame
+    $result[15] = oddParity( @result[ 3 .. 14 ] );
+
+    # add bus park
+    push @result, 0;
+
+    # add extra idle after bus park
+    push @result, 0;
+
+    # padding to the length of register write mode
+    @result[ 18 .. 26 ] = ("0") x 9;
+    if ($ext) {
+        @result[18 .. 35] = ("0") x 18;
+    }
+    return @result;
+}
+
 =head2 getDataArray
 
  return array for data pin
 
 =cut
 
-fun getDataArray (Str $reg, Int $read, Int $ext = 0)
+fun getDataArray (Str $reg, Int $read, Int $ext = 0, Int $reg0 = 0)
 {
     return &getClockArray( $read, $reg, $ext ) if $reg eq "nop";
 
@@ -300,6 +343,10 @@ fun getDataArray (Str $reg, Int $read, Int $ext = 0)
     my @addr = @bits[ 4 .. 11 ];
     my @data = @bits[ 12 .. 19 ];
     my @result;
+
+    if ( $reg0 and &isReg0WriteMode($reg) ) {
+        return &getDataArrayReg0( $reg, $ext );
+    }
 
     # SSC
     @result[ 0 .. 2 ] = qw(0 1 0);
@@ -553,9 +600,15 @@ method writeVectors (ArrayRef $ref)
                 "jump" );
         } elsif (/^\s*trig/i) {
             $self->printTriggerVector();
-        } elsif (/^(R:)?\s*(\w+\s*(?:,\s*\w+)*)/) {
-            my $read = $1 ? 1 : 0;
-            $self->writeSingleInstruction( $2, $read );    # read/write
+        } elsif (/^\s*(R:|0:)?\s*(\w+\s*(?:,\s*\w+)*)/) {    # read/write
+            my ( $read, $reg0 ) = ( 0, 0 );
+            $read = 1 if $1 and $1 eq "R:";
+            $reg0 = 1 if $1 and $1 eq "0:";
+            $self->writeSingleInstruction(
+                $2,
+                read => $read,
+                reg0 => $reg0
+            );
         }
     }
 }
@@ -580,7 +633,7 @@ method printDataInsComment (Str $data, Str $ins, Str $cmt, Str $tset = $self->{'
 
 =cut
 
-method writeSingleInstruction (Str $ins, Int $read)
+method writeSingleInstruction (Str $ins, :$read, :$reg0)
 {
     # pading with nop if regs is less than dut number
     $ins =~ s/\s+//g;
@@ -598,7 +651,7 @@ method writeSingleInstruction (Str $ins, Int $read)
     &transposeArrayOfArray( \@registers );
 
     for my $reg (@registers) {
-        $self->writeSingleRegister( $reg, \@ins, $read );
+        $self->writeSingleRegister( $reg, \@ins, read => $read, reg0 => $reg0 );
     }
 }
 
@@ -606,7 +659,7 @@ method writeSingleInstruction (Str $ins, Int $read)
 
 =cut
 
-method writeSingleRegister ( ArrayRef $regref, ArrayRef $insref, Int $read )
+method writeSingleRegister ( ArrayRef $regref, ArrayRef $insref, Int :$read, Int :$reg0 )
 {
 
     my @vecs;
@@ -616,7 +669,7 @@ method writeSingleRegister ( ArrayRef $regref, ArrayRef $insref, Int $read )
         my $reg = $regref->[$dut];
 
         my @clock = &getClockArray( $read, $reg, $extended );
-        my @data  = &getDataArray( $reg, $read, $extended );
+        my @data  = &getDataArray( $reg, $read, $extended, $reg0 );
 
         $vecs[ 2 * $dut ] = \@clock;
         $vecs[ 2 * $dut + 1 ] = \@data;
@@ -924,6 +977,18 @@ method parsePseudoPattern ($file)
 fun isExtended ( Str $reg )
 {
     return 1 if $reg =~ /0x\w[A-F2-9]\w{3,3}/i;
+    return 0;
+}
+
+=head2 isReg0WriteMode
+
+=cut
+
+fun isReg0WriteMode (Str $reg)
+{
+    if ( $reg =~ /0x[0-9A-F]00[0-7][0-9A-F]/i ) {
+        return 1;
+    }
     return 0;
 }
 
