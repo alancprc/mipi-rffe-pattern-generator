@@ -444,6 +444,7 @@ fun getCommentArray (Int $read, Str $reg="", Int $ext = 0)
           Data7 Data6 Data5 Data4 Data3 Data2 Data1 Data0 Parity2 BusPark);
         splice @comment, 16, 0, "BusPark" if $read;
     }
+    $comment[0] = $read ? "Read" : "Write";
     $comment[0] .= " $reg" if $reg;
 
     # add comment for stop cycle after bus park

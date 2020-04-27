@@ -104,7 +104,7 @@ is( &MipiPatternGenerator::isExtended("0xE1C38"), 0, "extended mode check" );
 {
     my @write = MipiPatternGenerator::getCommentArray( 0, "", 1 );
     my @exp   = qw(
-      SSC SSC SSC
+      Write SSC SSC
       SlaveAddr3 SlaveAddr2 SlaveAddr1 SlaveAddr0
       Command3 Command2 Command1 Command0
       ByteCount3 ByteCount2 ByteCount1 ByteCount0
@@ -118,7 +118,7 @@ is( &MipiPatternGenerator::isExtended("0xE1C38"), 0, "extended mode check" );
 
     my @read = MipiPatternGenerator::getCommentArray( 1, "", 1 );
     @exp = qw(
-      SSC SSC SSC
+      Read SSC SSC
       SlaveAddr3 SlaveAddr2 SlaveAddr1 SlaveAddr0
       Command3 Command2 Command1 Command0
       ByteCount3 ByteCount2 ByteCount1 ByteCount0

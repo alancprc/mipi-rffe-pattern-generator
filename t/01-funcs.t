@@ -67,14 +67,14 @@ isa_ok( $mipi, "MipiPatternGenerator" );
 # get comment
 {
     my @write = MipiPatternGenerator::getCommentArray(0);
-    my @exp   = qw( SSC SSC SSC SlaveAddr3 SlaveAddr2 SlaveAddr1 SlaveAddr0
+    my @exp   = qw( Write SSC SSC SlaveAddr3 SlaveAddr2 SlaveAddr1 SlaveAddr0
       Command2 Command1 Command0
       DataAddr4 DataAddr3 DataAddr2 DataAddr1 DataAddr0 Parity1
       Data7 Data6 Data5 Data4 Data3 Data2 Data1 Data0 Parity2 BusPark);
     is( join( "", @write ), join( "", @exp ), "write comment" );
 
     my @read = MipiPatternGenerator::getCommentArray(1);
-    @exp = qw( SSC SSC SSC SlaveAddr3 SlaveAddr2 SlaveAddr1 SlaveAddr0
+    @exp = qw( Read SSC SSC SlaveAddr3 SlaveAddr2 SlaveAddr1 SlaveAddr0
       Command2 Command1 Command0
       DataAddr4 DataAddr3 DataAddr2 DataAddr1 DataAddr0 Parity1 BusPark
       Data7 Data6 Data5 Data4 Data3 Data2 Data1 Data0 Parity2 BusPark);
