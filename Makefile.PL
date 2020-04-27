@@ -9,7 +9,7 @@ my %WriteMakefileArgs = (
     VERSION_FROM     => 'lib/MipiPatternGenerator.pm',
     ABSTRACT_FROM    => 'lib/MipiPatternGenerator.pm',
     LICENSE          => 'artistic_2',
-    MIN_PERL_VERSION => '5.010001',
+    MIN_PERL_VERSION => '5.014001',
     CONFIGURE_REQUIRES => {
         'ExtUtils::MakeMaker' => '0',
     },
