@@ -1,6 +1,6 @@
 package MipiPatternGenerator;
 
-use 5.010001;
+use v5.14;    # minimum version supported by Function::Parameters
 use strict;
 use warnings;
 
