@@ -601,7 +601,7 @@ method writeVectors (ArrayRef $ref)
                 "jump" );
         } elsif (/^\s*trig/i) {
             $self->printTriggerVector();
-        } elsif (/^\s*(R:|0:)?\s*(\w+\s*(?:,\s*\w+)*)/) {    # read/write
+        } elsif (/^\s*(R:|0:)?\s*(\w+\s*(?:,\s*\w+)*.*)$/) {    # read/write
             my ( $read, $reg0 ) = ( 0, 0 );
             $read = 1 if $1 and $1 eq "R:";
             $reg0 = 1 if $1 and $1 eq "0:";
@@ -839,6 +839,7 @@ method readRegisterTable (ArrayRef $ref)
 
         # remove trailing new line
         chomp @content;
+        s/\s+//g for @content;
         s/\R//g for @content;
 
         my @addr = split /,/, shift @content;
