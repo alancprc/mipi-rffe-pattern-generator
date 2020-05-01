@@ -25,33 +25,6 @@ MipiPatternGenerator - generate mipi pattern for Unison
 Generate pattern from pattern.txt and registerN.csv file.
 Multiple devices are Supported.
 
-pattern.txt if the pseudo pattern file, contains something like following:
-
-   ======================================================
-   DUT 1, 2                - required, indicates how many duts
-   Label: labelA           - optional
-       GSM_HB_HPM, nop     - register state in registerN.csv 
-       wait 1              - optional, wait 1 cycle
-       TRIG                - optional, trigger pin sets to 1
-       wait 577
-       JMP pa_off          - optional, jump to label pa_off
-   ======================================================
-
-registerN.csv should contain the register table for device. One registerN.csv
-for each device. typically, N = 1 or 2.
-
-Supported Unison pattern micro-instructions:
-
-   RPT
-   STOP
-   TRIG
-   JMP
-
-Pseudo instructions:
-
-   wait    -   clock/data stays 0 on this vector for all dut
-   nop     -   no operation for specific dut, clock/data stays all zero
-
 =head1 VERSION
 
 Version 0.01
