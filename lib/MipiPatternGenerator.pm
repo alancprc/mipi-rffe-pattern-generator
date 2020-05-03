@@ -218,44 +218,48 @@ fun replace01withLH (ArrayRef $dataref, Int $start, Int $len)
 
 =cut
 
-method getTimeSetArray (Int $read, Int $ext = 0)
+method getTimeSetArray (@data)
 {
-    if ($ext) {
-
-        # 3 ssc, 23/24 cmd, 1 stop cycle after bus park
-        my $bits = 35 + $read + 1;
-        my @tset = ( $self->{'tsetWrite'} ) x $bits;
-
-        splice @tset, 25, 10, ( $self->{'tsetRead'} ) x 10 if $read;
-        return @tset;
-    }
-
-    # 3 ssc, 23/24 cmd, 1 stop cycle after bus park
-    my $bits = 3 + 23 + $read + 1;
-    my @tset = ( $self->{'tsetWrite'} ) x $bits;
-
-    splice @tset, 17, 9, ( $self->{'tsetRead'} ) x 9 if $read;
-    return @tset;
+    my %tset = (
+        "0" => $self->{'tsetWrite'},
+        "1" => $self->{'tsetWrite'},
+        "H" => $self->{'tsetRead'},
+        "L" => $self->{'tsetRead'}
+      );
+    my @result = map { $tset{$_} } @data;
+    return @result;
 }
 
 =head2 getClockArray
 
- return array for clock pin
+ return array for clock pin given data array
 
 =cut
 
-fun getClockArray (Int $read, Str $reg = "", Int $ext = 0)
+fun getClockArray (@data)
+{
+    return @data unless $data[1];
+
+    my @result = ( "1" ) x $#data;
+    @result[0..2] = qw(0 0 0);
+    push @result, "0";
+
+    return @result;
+}
+
+=head2 getNopData
+
+ return idle data/clock
+
+=cut
+
+fun getNopData (Int $read, Int $ext = 0)
 {
     my $numZero = 3;
-    my $numOne  = 23;
+    my $numOne  = $ext ? 32 : 23;
     my $numIdle = 1;
 
-    $numOne = 32 if $ext;
-
-    return ("0") x ( $numZero + $numOne + $read + $numIdle ) if $reg eq "nop";
-
-    my $str = "0" x $numZero . '1' x ( $numOne + $read ) . '0';
-    return split //, $str;
+    return ("0") x ( $numZero + $numOne + $read + $numIdle );
 }
 
 =head2 getDataArrayReg0
@@ -266,23 +270,19 @@ fun getClockArray (Int $read, Str $reg = "", Int $ext = 0)
 
 fun getDataArrayReg0 (Str $reg, $ext)
 {
-    my @bits = split //, sprintf( "%020b", hex($reg) );
-    my @sa   = @bits[ 0 .. 3 ];
-    my @addr = @bits[ 4 .. 11 ];
-    my @data = @bits[ 12 .. 19 ];
     my @result;
 
     # SSC
     @result[ 0 .. 2 ] = qw(0 1 0);
 
     # SA
-    @result[ 3 .. 6 ] = @sa;
+    @result[ 3 .. 6 ] = &getBits( 4, &getSlaveAddr($reg) );
 
     # CMD
     $result[7] = 1;
 
     # Data
-    @result[8 .. 14] = @data[1 .. 7];
+    @result[8 .. 14] = &getBits( 7, &getRegData($reg) );
 
     # parity for cmd frame
     $result[15] = oddParity( @result[ 3 .. 14 ] );
@@ -294,10 +294,10 @@ fun getDataArrayReg0 (Str $reg, $ext)
     push @result, 0;
 
     # padding to the length of register write mode
-    @result[ 18 .. 26 ] = ("0") x 9;
-    if ($ext) {
-        @result[18 .. 35] = ("0") x 18;
-    }
+    #@result[ 18 .. 26 ] = ("0") x 9;
+    #if ($ext) {
+    #    @result[18 .. 35] = ("0") x 18;
+    #}
     return @result;
 }
 
@@ -309,12 +309,11 @@ fun getDataArrayReg0 (Str $reg, $ext)
 
 fun getDataArray (Str $reg, Int $read, Int $ext = 0, Int $reg0 = 0)
 {
-    return &getClockArray( $read, $reg, $ext ) if $reg eq "nop";
+    # for nop
+    return &getNopData( $read, $ext ) if $reg eq "nop";
 
-    my @bits = split //, sprintf( "%020b", hex($reg) );
-    my @sa   = @bits[ 0 .. 3 ];
-    my @addr = @bits[ 4 .. 11 ];
-    my @data = @bits[ 12 .. 19 ];
+    my @sa   = &getBits( 4, &getSlaveAddr($reg) );
+    my @addr = &getBits( 8, &getRegAddr($reg) );
     my @result;
 
     if ( $reg0 and &isReg0WriteMode($reg) ) {
@@ -327,27 +326,34 @@ fun getDataArray (Str $reg, Int $read, Int $ext = 0, Int $reg0 = 0)
     # SA
     @result[ 3 .. 6 ] = @sa;
 
-    if ($ext) {
+    if ( $ext ) {
+        my @bytes = &getRegData($reg);
 
         # CMD
         @result[ 7 .. 10 ] = ( 0, 0, $read, 0 );
 
         # BC
-        @result[ 11 .. 14 ] = ( 0, 0, 0, 0 );
+        @result[ 11 .. 14 ] = split //, sprintf( "%04b", $#bytes );
 
         # parity for cmd
         $result[15] = oddParity( @result[ 3 .. 14 ] );
 
         # Addr
-        @result[ 16 .. 23 ] = @addr;
-        $result[24] = oddParity(@addr);
+        push @result, @addr;
+        push @result, oddParity(@addr);
+
+        # bus park if read
+        push @result, "0" if $read;
 
         # Data
-        @result[ 25 .. 32 ] = @data;
-        $result[33] = oddParity(@data);
+        for my $byte (@bytes){
+            my @bits = &getBits( 8, $byte );
+            my $parity = &oddParity(@bits);
+            push @result, @bits, &oddParity(@bits);
 
-        # replace data and parity with expected logic if read
-        &replace01withLH( \@result, 25, 9 ) if $read;
+            # replace data and parity with expected logic if read
+            &replace01withLH( \@result, -9, 9 ) if $read;
+        }
 
         # add bus park
         push @result, 0;
@@ -355,11 +361,9 @@ fun getDataArray (Str $reg, Int $read, Int $ext = 0, Int $reg0 = 0)
         # add extra idle after bus park
         push @result, 0;
 
-        # bus park if read
-        splice @result, 25, 0, 0 if $read;
-
         return @result;
     }
+    my @data = &getBits( 8, &getRegData($reg) );
 
     # CMD
     @result[ 7 .. 9 ] = ( 0, 1, $read );
@@ -385,6 +389,109 @@ fun getDataArray (Str $reg, Int $read, Int $ext = 0, Int $reg0 = 0)
 
     # bus park if read
     splice @result, 16, 0, 0 if $read;
+
+    return @result;
+}
+
+=head2 commentArray
+
+ return comment array for given mode, $bytes starts from 0.
+ $mode:
+     default    =>  register read/write
+     extended   =>  extended register read/write
+     reg0       =>  register 0 write
+
+=cut
+
+fun commentArray ( Int :$bytes=0, Int :$read=0, Str :$mode="")
+{
+    return &commentArrayReadWrite($read) unless $mode; 
+    return &commentArrayReg0() if $mode =~ /reg0/i;
+    return &commentArrayExtended($read, $bytes) if $mode =~ /extend/i;
+}
+
+=head2 commentArrayReg0
+
+ return comment array for resiter 0 write mode.
+
+=cut
+
+fun commentArrayReg0 ()
+{
+    my @result = qw(
+      Write SSC SSC
+      SlaveAddr3 SlaveAddr2 SlaveAddr1 SlaveAddr0
+      Command0
+      DataAddr6 DataAddr5 DataAddr4
+      DataAddr3 DataAddr2 DataAddr1 DataAddr0
+      ParityCmd
+      BusPark);
+
+    # add comment for stop cycle after bus park
+    push @result, "";
+    return @result;
+}
+
+=head2 commentArrayReadWrite
+
+ return comment array for register read/write mode.
+
+=cut
+
+fun commentArrayReadWrite (Int $read=0)
+{
+    my @result = qw(
+      Write SSC SSC
+      SlaveAddr3 SlaveAddr2 SlaveAddr1 SlaveAddr0
+      Command2 Command1 Command0
+      DataAddr4 DataAddr3 DataAddr2 DataAddr1 DataAddr0
+      ParityCmd
+      Data7 Data6 Data5 Data4 Data3 Data2 Data1 Data0
+      ParityData
+      BusPark);
+
+    splice @result, 16, 0, "BusPark" if $read;
+
+    $result[0] = "Read" if $read;
+
+    # add comment for stop cycle after bus park
+    push @result, "";
+
+    return @result;
+}
+
+=head2 commentArrayExtended
+
+ return comment array for extended mode, $bytes starts from 1.
+
+=cut
+
+fun commentArrayExtended (Int $read=0, Int $bytes=0)
+{
+    my @result = qw(
+      Write SSC SSC
+      SlaveAddr3 SlaveAddr2 SlaveAddr1 SlaveAddr0
+      Command3 Command2 Command1 Command0
+      ByteCount3 ByteCount2 ByteCount1 ByteCount0
+      ParityCmd
+      DataAddr7 DataAddr6 DataAddr5 DataAddr4
+      DataAddr3 DataAddr2 DataAddr1 DataAddr0
+      ParityAddr);
+
+    push @result, "BusPark" if $read;
+
+    $result[0] = "Read" if $read;
+
+    for ( 0 .. $bytes ) {
+        push @result,
+          qw (Data7 Data6 Data5 Data4 Data3 Data2 Data1 Data0 ParityData);
+    }
+
+    # add bus park
+    push @result, "BusPark";
+
+    # add comment for stop cycle after bus park
+    push @result, "";
 
     return @result;
 }
@@ -604,6 +711,7 @@ method printDataInsComment (Str $data, Str $ins, Str $cmt, Str $tset = $self->{'
 =head2 writeSingleInstruction
 
  write read/write mipi operation segment into pattern file
+ reg0: register 0 write mode will be used when available.
 
 =cut
 
@@ -631,33 +739,48 @@ method writeSingleInstruction (Str $ins, :$read, :$reg0)
 
 =head2 writeSingleRegister
 
+ reg0: register 0 write mode will be used when available.
+
 =cut
 
 method writeSingleRegister ( ArrayRef $regref, ArrayRef $insref, Int :$read, Int :$reg0 )
 {
 
     my @vecs;
-    my @cmt;
+    my @description;
     my $extended = grep { &isExtended($_) } @$regref;
+    my @timesets;
+    my @comments;
     for my $dut ( 0 .. $self->dutNum - 1 ) {
         my $reg = $regref->[$dut];
 
-        my @clock = &getClockArray( $read, $reg, $extended );
+        # set mode
+        my $mode = &getMipiMode($regref, $dut, reg0=>$reg0);
+
         my @data  = &getDataArray( $reg, $read, $extended, $reg0 );
+        my @clock = &getClockArray(@data);
 
         $vecs[ 2 * $dut ] = \@clock;
         $vecs[ 2 * $dut + 1 ] = \@data;
 
-        $cmt[$dut] =
-          sprintf( "%d:%s:%s", $dut + 1, $insref->[$dut], $regref->[$dut] );
-    }
-    my @tset    = $self->getTimeSetArray( $read, $extended );
-    my @comment = &getCommentArray( $read, "@cmt", $extended );
+        my @tset = $self->getTimeSetArray( @data );
+        $timesets[$dut] = \@tset;
 
+        my @bytes = &getRegData($reg);
+        my @comment = &commentArray( read=>$read, mode=>$mode, bytes=>$#bytes );
+        $comments[$dut] = \@comment;
+    }
+    my @timeset = &mergeTimeSetArray(\@timesets);
+    my $description = &getDescription($insref, $regref);
+
+    my @comment = &mergeComment( \@comments );
+    $comment[0] .= " $description";
+
+    &alignVectorData( \@vecs );
     &transposeArrayOfArray( \@vecs );
     $self->addTriggerPinData( \@vecs );
     $self->addExtraPinData( \@vecs );
-    $self->printVectorData( \@vecs, \@tset, \@comment );
+    $self->printVectorData( \@vecs, \@timeset, \@comment );
 }
 
 =head2 printVectorData
@@ -703,6 +826,25 @@ method addExtraPinData ($ref)
     }
 }
 
+=head2 alignVectorData
+
+=cut
+
+sub alignVectorData
+{
+    my $ref = shift;
+
+    # get max length
+    my @length = map { scalar @{$_} } @$ref;
+    my $maxlen = max(@length);
+
+    for (@$ref) {
+        while ( @{$_} < $maxlen ) {
+            push @{$_}, "0";
+        }
+    }
+}
+
 =head2 alignRegWithNop
 
  if the number of register among devices is not equal, make them equal by
@@ -722,11 +864,13 @@ fun alignRegWithNop (ArrayRef $ref)
     }
 }
 
-=head2 alignTimeSet
+=head2 mergeTimeSetArray
+
+ return the timeset array with max size
 
 =cut
 
-fun alignTimeSet ( ArrayRef $ref )
+fun mergeTimeSetArray ( ArrayRef $ref )
 {
     my $maxlen = 0;
     my $maxidx = 0;
@@ -740,6 +884,38 @@ fun alignTimeSet ( ArrayRef $ref )
         ++$i;
     }
     return @{ $ref->[$maxidx] };
+}
+
+=head2 mergeComment
+
+ merge comment for multiple device
+
+=cut
+
+fun mergeComment(ArrayRef $ref)
+{
+    my $maxlen = 0;
+    my $maxidx = 0;
+    for my $i ( 0 .. $#$ref ) {
+        my $len = @{ $ref->[$i] };
+        if ( $len > $maxlen ) {
+            $maxlen = $len;
+            $maxidx = $i;
+        }
+    }
+
+    my @merge;
+    for my $i ( 0 .. $maxlen ) {
+        my $str = '';
+        for my $d ( 0 .. $#$ref ) {
+            if ( $ref->[$d][$i] and $ref->[$d][$i] ne $str ) {
+                my $new = $ref->[$d][$i];
+                $str = $str ? join( ', ', $str, $new ) : $new;
+            }
+        }
+        $merge[$i] = $str;
+    }
+    return @merge;
 }
 
 =head2 transposeArrayOfArray
@@ -951,7 +1127,13 @@ method parsePseudoPattern ($file)
 
 fun isExtended ( Str $reg )
 {
-    return 1 if $reg =~ /0x\w[A-F2-9]\w{3,3}/i;
+    return 0 if $reg eq "nop";
+
+    my $addr = hex (&getRegAddr($reg));
+    return 1 if $addr > 0x1F and $addr <= 0xff;
+    my @data = &getRegData($reg);
+    return 1 if @data > 1;
+
     return 0;
 }
 
@@ -961,10 +1143,29 @@ fun isExtended ( Str $reg )
 
 fun isReg0WriteMode (Str $reg)
 {
-    if ( $reg =~ /0x[0-9A-F]00[0-7][0-9A-F]/i ) {
+    if ( &getRegAddr($reg) eq "00" and hex( &getRegData($reg) ) <= 0x7f ) {
         return 1;
     }
     return 0;
+}
+
+=head2 getMipiMode
+
+ return MIPI mode for current register of current dut.
+ "reg0"     : register 0 write mode
+ "extended" : extended mode
+ ""         : register read/write mode
+
+=cut
+
+fun getMipiMode (ArrayRef $regref, Int $dut, Int :$reg0)
+{
+    return "reg0" if $reg0 and isReg0WriteMode( $regref->[$dut] );
+
+    my $extended = grep &isExtended($_), @$regref;
+    return "extended" if $extended;
+
+    return "";
 }
 
 =head2 printTriggerVector
@@ -977,6 +1178,85 @@ method printTriggerVector ()
 
     $ins = "[TRIG]" unless $self->getTriggerPin();
     $self->printDataInsComment( $self->getIdleVectorData(1), $ins, "trigger" );
+}
+
+=head2 getSlaveAddr
+
+ return slave address in Str.
+
+=cut
+
+fun getSlaveAddr (Str $reg)
+{
+    return "" if $reg eq "nop";
+
+    if ( $reg =~ /0x([[:xdigit:]])/x ) {
+        return lc $1;
+    } else {
+        die "invalid slave address for $reg";
+    }
+}
+
+=head2 getRegAddr
+
+=cut
+
+fun getRegAddr (Str $reg)
+{
+    return "" if $reg eq "nop";
+
+    if ( $reg =~ /0x[[:xdigit:]] ([[:xdigit:]]{2,2}) :?(:?[[:xdigit:]]{2,2})/x )
+    {
+        return lc $1;
+    } else {
+        die "invalid register address for $reg";
+    }
+}
+
+=head2 getRegData
+
+=cut
+
+fun getRegData (Str $reg)
+{
+    return "" if $reg eq "nop";
+
+    if ( $reg =~ /0x[[:xdigit:]]{3,3} ([[:xdigit:]]{2,2}) $/x ) {
+        return ($1);
+    } elsif ( $reg =~ /0x[[:xdigit:]]{3,3}:( (:? -?[[:xdigit:]]{2,2})+ ) /x ) {
+        return split '-', $1;
+    } else {
+        die "invalid register data for $reg";
+    }
+}
+
+=head2 getBits
+
+=cut
+
+fun getBits(Int $bitNum, Str $reg)
+{
+    return split "", sprintf( "%0${bitNum}b", hex($reg) );
+}
+
+=head2 getDescription
+
+=cut
+
+fun getDescription (ArrayRef $insref,ArrayRef $regref)
+{
+    my @result;
+    for my $dut ( 0 .. $#$regref ) {
+        if ( $insref->[$dut] eq $regref->[$dut] ) {
+            $result[$dut] =
+              sprintf( "%d:%s", $dut + 1, $insref->[$dut]);
+        } else {
+            $result[$dut] =
+              sprintf( "%d:%s:%s", $dut + 1, $insref->[$dut], $regref->[$dut] );
+        }
+    }
+
+    return "@result";
 }
 
 =head1 AUTHOR

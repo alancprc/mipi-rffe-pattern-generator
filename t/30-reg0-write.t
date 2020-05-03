@@ -68,13 +68,8 @@ is( &MipiPatternGenerator::isExtended("0xE1C38"), 0, "extended mode check" );
 # get reg0 write data
 {
     my @data = MipiPatternGenerator::getDataArrayReg0( "0xE003C", 0 );
-    my $exp  = "010111010111100100000000000";
-    is( join( "", @data ), $exp, "reg0 write data pad to reg write" );
-
-    # reg ext
-    @data = MipiPatternGenerator::getDataArrayReg0( "0xE003C", 1 );
-    $exp  = "010111010111100100000000000000000000";
-    is( join( "", @data ), $exp, "reg0 write data pad to extended write" );
+    my $exp  = "010111010111100100";
+    is( join( "", @data ), $exp, "reg0 write data" );
 }
 
 # isReg0WriteMode
