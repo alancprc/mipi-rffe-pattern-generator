@@ -45,22 +45,27 @@ isa_ok( $mipi, "MipiPatternGenerator" );
 
 # get clock
 {
-    my @data = MipiPatternGenerator::getClockArray(0);
+    my @data = split //, "010111001011100000111000000";
+    my @clock = MipiPatternGenerator::getClockArray(@data);
     my $exp  = "000111111111111111111111110";
-    is( join( "", @data ), $exp, "write clock bits" );
+    is( join( "", @clock ), $exp, "read/write clock bits" );
 
-    @data = MipiPatternGenerator::getClockArray(1);
-    $exp  = "0001111111111111111111111110";
-    is( join( "", @data ), $exp, "read clock bits" );
+    @data = split //, "000000000000000000000000000";
+    @clock = MipiPatternGenerator::getClockArray(@data);
+    $exp  = "000000000000000000000000000";
+    is( join( "", @clock ), $exp, "nop clock bits" );
 }
 
 # set/get tset
 {
+    my @data = MipiPatternGenerator::getDataArray( "0xE1C38", 0 );
+
     $mipi->setTimeSet("W", "r");
-    my @write = $mipi->getTimeSetArray(0);
+    my @write = $mipi->getTimeSetArray(@data);
     is ( join("", @write), "W" x 27, "write time set");
 
-    my @read = $mipi->getTimeSetArray(1);
+    @data = MipiPatternGenerator::getDataArray( "0xE1C40", 1 );
+    my @read = $mipi->getTimeSetArray(@data);
     is ( join("", @read), "W" x 17 . "r" x 9 . "WW", "read time set");
 }
 

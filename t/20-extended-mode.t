@@ -55,6 +55,10 @@ Label: test
     Isolation, LB_GMSK_HPM
 R:  0xE0011
 R:  0xE7F11
+
+# extended mode write/read with multiple data
+    0xE00:00-11-22-33, 0xE00:00-11-22
+R:  0xE00:00-11-22-33, 0xE00:00-11-22
 EOF
 
 open $fh, ">", "t/extended.txt";
@@ -63,6 +67,7 @@ close $fh;
 
 is( &MipiPatternGenerator::isExtended("0xE2C38"), 1, "extended mode check" );
 is( &MipiPatternGenerator::isExtended("0xE1C38"), 0, "extended mode check" );
+is( &MipiPatternGenerator::isExtended("0xE1C:38"), 0, "extended mode check" );
 
 # get data
 {
@@ -77,27 +82,126 @@ is( &MipiPatternGenerator::isExtended("0xE1C38"), 0, "extended mode check" );
 
 # get clock
 {
-    my @data = MipiPatternGenerator::getClockArray(0, "0xE2C38", 1);
+    my @data = split //, "010111000000000000101100000111000000";
+    my @clock = MipiPatternGenerator::getClockArray(@data);
     my $exp  = "000111111111111111111111111111111110";
-    is( join( "", @data ), $exp, "extended write clock bits" );
+    is( join( "", @clock ), $exp, "extended clock bits" );
 
-    @data = MipiPatternGenerator::getClockArray( 1, "0xE2C38", 1 );
-    $exp  = "0001111111111111111111111111111111110";
-    is( join( "", @data ), $exp, "extended read clock bits" );
-
-    @data = MipiPatternGenerator::getClockArray( 1, "nop", 1 );
+    @data = split //, "0000000000000000000000000000000000000";
+    @clock = MipiPatternGenerator::getClockArray(@data);
     $exp  = "0000000000000000000000000000000000000";
-    is( join( "", @data ), $exp, "extended read clock bits" );
+    is( join( "", @clock ), $exp, "extended read clock bits" );
 }
 
 # set/get tset
 {
     $mipi->setTimeSet("W", "r");
-    my @write = $mipi->getTimeSetArray(0, 1);
+    my @data = MipiPatternGenerator::getDataArray( "0xE2C38", 0, 1);
+    my @write = $mipi->getTimeSetArray(@data);
     is ( join("", @write), "W" x 36, "extended write time set");
 
-    my @read = $mipi->getTimeSetArray(1, 1);
-    is ( join("", @read), "W" x 25 . "r" x 10 . "WW", "extended read time set");
+    @data = MipiPatternGenerator::getDataArray( "0xE2C47", 1, 1 );
+    my @read = $mipi->getTimeSetArray(@data);
+    is ( join("", @read), "W" x 26 . "r" x 9 . "WW", "extended read time set");
+}
+
+# get comment
+{
+    my @write = MipiPatternGenerator::getCommentArray( 0, "", 1 );
+    my @exp   = qw(
+      Write SSC SSC
+      SlaveAddr3 SlaveAddr2 SlaveAddr1 SlaveAddr0
+      Command3 Command2 Command1 Command0
+      ByteCount3 ByteCount2 ByteCount1 ByteCount0
+      ParityCmd
+      DataAddr7 DataAddr6 DataAddr5 DataAddr4
+      DataAddr3 DataAddr2 DataAddr1 DataAddr0
+      ParityAddr
+      Data7 Data6 Data5 Data4 Data3 Data2 Data1 Data0
+      ParityData BusPark);
+    is( join( "", @write ), join( "", @exp ), "extended write comment" );
+
+    my @read = MipiPatternGenerator::getCommentArray( 1, "", 1 );
+    @exp = qw(
+      Read SSC SSC
+      SlaveAddr3 SlaveAddr2 SlaveAddr1 SlaveAddr0
+      Command3 Command2 Command1 Command0
+      ByteCount3 ByteCount2 ByteCount1 ByteCount0
+      ParityCmd
+      DataAddr7 DataAddr6 DataAddr5 DataAddr4
+      DataAddr3 DataAddr2 DataAddr1 DataAddr0
+      ParityAddr
+      BusPark
+      Data7 Data6 Data5 Data4 Data3 Data2 Data1 Data0
+      ParityData BusPark);
+    is( join( "", @read ), join( "", @exp ), "extended read comment" );
+}
+
+{
+    my $slave = MipiPatternGenerator::getSlaveAddr("0xC0000");
+    is( $slave, "c", "getSlaveAddr" );
+
+    $slave = MipiPatternGenerator::getSlaveAddr("0xd0000");
+    is( $slave, "d", "getSlaveAddr" );
+}
+
+{
+    my $addr = MipiPatternGenerator::getRegAddr("0xC1C00");
+    is( $addr, "1c", "getRegAddr" );
+
+    $addr = MipiPatternGenerator::getRegAddr("0xd3f00");
+    is( $addr, "3f", "getRegAddr" );
+
+    $addr = MipiPatternGenerator::getRegAddr("0xd3e:00-11");
+    is( $addr, "3e", "getRegAddr" );
+}
+
+{
+    my @data = MipiPatternGenerator::getRegData("0xC1C00");
+    is( $data[0], "00", "getRegData" );
+
+    my $data = MipiPatternGenerator::getRegData("0xd3f5a");
+    is( $data, "5a", "getRegData" );
+
+    @data = MipiPatternGenerator::getRegData("0xd3e:00-11");
+    is( join("", @data), "0011", "getRegData" );
+}
+
+# get data
+{
+    my @data = MipiPatternGenerator::getDataArray( "0xE2C:38-11", 0, 1);
+    my $exp = "010111000000001100101100000111000000010001100";
+    is( join( "", @data ), $exp, "extended write data bits");
+
+    @data = MipiPatternGenerator::getDataArray( "0xE2C:47-1B-2B-3B", 1, 1 );
+    $exp = "01011100010001110010110000LHLLLHHHHLLLHHLHHHLLHLHLHHHLLHHHLHHL00";
+    is( join( "", @data ), $exp, "extended read data bits" );
+}
+
+# get clock
+{
+    my @data = MipiPatternGenerator::getDataArray( "0xE2C:38-11", 0, 1);
+    my @clock = MipiPatternGenerator::getClockArray(@data);
+    my $exp  = "000111111111111111111111111111111111111111110";
+    is( join( "", @clock ), $exp, "extended write clock bits" );
+
+    @data = split //, "0000000000000000000000000000000000000";
+    @clock = MipiPatternGenerator::getClockArray(@data);
+    $exp  = "0000000000000000000000000000000000000";
+    is( join( "", @clock ), $exp, "extended read clock bits" );
+}
+
+# set/get tset
+{
+    my @data = MipiPatternGenerator::getDataArray( "0xE2C:38-11", 0, 1);
+
+    $mipi->setTimeSet("W", "r");
+    my @write = $mipi->getTimeSetArray(@data);
+    is ( join("", @write), "W" x 45, "extended write time set");
+
+    @data = MipiPatternGenerator::getDataArray( "0xE2C:47-1B-2B-3B", 1, 1 );
+    my @read = $mipi->getTimeSetArray(@data);
+    is ( join("", @read), "W" x 26 . "r" x 36 . "WW", "extended read time set");
 }
 
 # get comment
@@ -142,7 +246,8 @@ close $fh;
 
 # vector number test
 my $vectors = grep /^\*/, @content;
-is( $vectors, 27 * 5 + 36 + 28 + 37 , "vector number" );
+is( $vectors, 27 * 5 + 36 + 28 + 37 + 36 + 3 * 9 + 37 + 3 * 9,
+    "vector number" );
 
 # pattern end
 my $end = grep /^\s*}/, @content;
