@@ -496,43 +496,6 @@ fun commentArrayExtended (Int $read=0, Int $bytes=0)
     return @result;
 }
 
-=head2 getCommentArray
-
-=cut
-
-fun getCommentArray (Int $read, Str $reg="", Int $ext = 0)
-{
-    my @comment;
-    if ($ext) {
-        @comment = qw(
-          SSC SSC SSC
-          SlaveAddr3 SlaveAddr2 SlaveAddr1 SlaveAddr0
-          Command3 Command2 Command1 Command0
-          ByteCount3 ByteCount2 ByteCount1 ByteCount0
-          ParityCmd
-          DataAddr7 DataAddr6 DataAddr5 DataAddr4
-          DataAddr3 DataAddr2 DataAddr1 DataAddr0
-          ParityAddr
-          Data7 Data6 Data5 Data4 Data3 Data2 Data1 Data0
-          ParityData BusPark);
-        splice @comment, 25, 0, "BusPark" if $read;
-    } else {
-        @comment = qw(
-          SSC SSC SSC SlaveAddr3 SlaveAddr2 SlaveAddr1 SlaveAddr0
-          Command2 Command1 Command0
-          DataAddr4 DataAddr3 DataAddr2 DataAddr1 DataAddr0 Parity1
-          Data7 Data6 Data5 Data4 Data3 Data2 Data1 Data0 Parity2 BusPark);
-        splice @comment, 16, 0, "BusPark" if $read;
-    }
-    $comment[0] = $read ? "Read" : "Write";
-    $comment[0] .= " $reg" if $reg;
-
-    # add comment for stop cycle after bus park
-    push @comment, "";
-
-    return @comment;
-}
-
 =head2 oddParity
 
  calculate odd parity bit for given array

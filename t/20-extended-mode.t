@@ -107,7 +107,7 @@ is( &MipiPatternGenerator::isExtended("0xE1C:38"), 0, "extended mode check" );
 
 # get comment
 {
-    my @write = MipiPatternGenerator::getCommentArray( 0, "", 1 );
+    my @write = MipiPatternGenerator::commentArray( mode => "extended" );
     my @exp   = qw(
       Write SSC SSC
       SlaveAddr3 SlaveAddr2 SlaveAddr1 SlaveAddr0
@@ -121,7 +121,8 @@ is( &MipiPatternGenerator::isExtended("0xE1C:38"), 0, "extended mode check" );
       ParityData BusPark);
     is( join( "", @write ), join( "", @exp ), "extended write comment" );
 
-    my @read = MipiPatternGenerator::getCommentArray( 1, "", 1 );
+    my @read =
+      MipiPatternGenerator::commentArray( mode => "extended", read => 1 );
     @exp = qw(
       Read SSC SSC
       SlaveAddr3 SlaveAddr2 SlaveAddr1 SlaveAddr0
@@ -206,7 +207,8 @@ is( &MipiPatternGenerator::isExtended("0xE1C:38"), 0, "extended mode check" );
 
 # get comment
 {
-    my @write = MipiPatternGenerator::getCommentArray( 0, "", 1 );
+    my @write =
+      MipiPatternGenerator::commentArray( mode => "extendec", bytes => 1 );
     my @exp   = qw(
       Write SSC SSC
       SlaveAddr3 SlaveAddr2 SlaveAddr1 SlaveAddr0
@@ -217,10 +219,17 @@ is( &MipiPatternGenerator::isExtended("0xE1C:38"), 0, "extended mode check" );
       DataAddr3 DataAddr2 DataAddr1 DataAddr0
       ParityAddr
       Data7 Data6 Data5 Data4 Data3 Data2 Data1 Data0
-      ParityData BusPark);
-    is( join( "", @write ), join( "", @exp ), "extended write comment" );
+      ParityData
+      Data7 Data6 Data5 Data4 Data3 Data2 Data1 Data0
+      ParityData
+      BusPark);
+    is( join( "", @write ), join( "", @exp ), "extended write 2 bytes comment" );
 
-    my @read = MipiPatternGenerator::getCommentArray( 1, "", 1 );
+    my @read = MipiPatternGenerator::commentArray(
+        mode  => "extended",
+        read  => 1,
+        bytes => 1
+    );
     @exp = qw(
       Read SSC SSC
       SlaveAddr3 SlaveAddr2 SlaveAddr1 SlaveAddr0
@@ -232,8 +241,11 @@ is( &MipiPatternGenerator::isExtended("0xE1C:38"), 0, "extended mode check" );
       ParityAddr
       BusPark
       Data7 Data6 Data5 Data4 Data3 Data2 Data1 Data0
-      ParityData BusPark);
-    is( join( "", @read ), join( "", @exp ), "extended read comment" );
+      ParityData
+      Data7 Data6 Data5 Data4 Data3 Data2 Data1 Data0
+      ParityData
+      BusPark);
+    is( join( "", @read ), join( "", @exp ), "extended read 2 bytes comment" );
 }
 
 $mipi->gen("t/extended.txt");
