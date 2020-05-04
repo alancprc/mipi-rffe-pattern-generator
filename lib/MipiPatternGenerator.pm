@@ -894,28 +894,21 @@ fun mergeTimeSetArray ( ArrayRef $ref )
 
 fun mergeComment(ArrayRef $ref)
 {
-    my $maxlen = 0;
-    my $maxidx = 0;
-    for my $i ( 0 .. $#$ref ) {
-        my $len = @{ $ref->[$i] };
-        if ( $len > $maxlen ) {
-            $maxlen = $len;
-            $maxidx = $i;
-        }
-    }
+    # get max length
+    my @length = map { scalar @{$_} } @$ref;
+    my $maxlen = max(@length);
 
-    my @merge;
-    for my $i ( 0 .. $maxlen ) {
-        my $str = '';
-        for my $d ( 0 .. $#$ref ) {
-            if ( $ref->[$d][$i] and $ref->[$d][$i] ne $str ) {
-                my $new = $ref->[$d][$i];
-                $str = $str ? join( ', ', $str, $new ) : $new;
+    my @result = @{ $ref->[0] };
+    for my $d ( 1 .. $#$ref ) {
+        for my $i ( 0 .. $maxlen ) {
+            $ref->[$d][$i] = "" unless $ref->[$d][$i];
+            $result[$i] = "" unless $result[$i];
+            if ( $ref->[$d][$i] ne $result[$i] ) {
+                $result[$i] .= ", " . $ref->[$d][$i];
             }
         }
-        $merge[$i] = $str;
     }
-    return @merge;
+    return @result;
 }
 
 =head2 transposeArrayOfArray
