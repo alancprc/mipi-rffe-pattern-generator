@@ -1143,7 +1143,9 @@ fun isExtended ( Str $reg )
 
 fun isReg0WriteMode (Str $reg)
 {
-    if ( &getRegAddr($reg) eq "00" and hex( &getRegData($reg) ) <= 0x7f ) {
+    my $addr = &getRegAddr($reg);
+    my @data = &getRegData($reg);
+    if ( $addr eq "00" and @data == 1 and hex( $data[0] ) <= 0x7f ) {
         return 1;
     }
     return 0;
