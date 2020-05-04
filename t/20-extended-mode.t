@@ -107,7 +107,7 @@ is( &MipiPatternGenerator::isExtended("0xE1C:38"), 0, "extended mode check" );
 
 # get comment
 {
-    my @write = MipiPatternGenerator::commentArray( mode => "extended" );
+    my @write = MipiPatternGenerator::getCommentArray( mode => "extended" );
     my @exp   = qw(
       Write SSC SSC
       SlaveAddr3 SlaveAddr2 SlaveAddr1 SlaveAddr0
@@ -122,7 +122,7 @@ is( &MipiPatternGenerator::isExtended("0xE1C:38"), 0, "extended mode check" );
     is( join( "", @write ), join( "", @exp ), "extended write comment" );
 
     my @read =
-      MipiPatternGenerator::commentArray( mode => "extended", read => 1 );
+    MipiPatternGenerator::getCommentArray( mode => "extended", read => 1 );
     @exp = qw(
       Read SSC SSC
       SlaveAddr3 SlaveAddr2 SlaveAddr1 SlaveAddr0
@@ -208,7 +208,7 @@ is( &MipiPatternGenerator::isExtended("0xE1C:38"), 0, "extended mode check" );
 # get comment
 {
     my @write =
-      MipiPatternGenerator::commentArray( mode => "extendec", bytes => 1 );
+    MipiPatternGenerator::getCommentArray( mode => "extendec", bytes => 1 );
     my @exp   = qw(
       Write SSC SSC
       SlaveAddr3 SlaveAddr2 SlaveAddr1 SlaveAddr0
@@ -225,7 +225,7 @@ is( &MipiPatternGenerator::isExtended("0xE1C:38"), 0, "extended mode check" );
       BusPark);
     is( join( "", @write ), join( "", @exp ), "extended write 2 bytes comment" );
 
-    my @read = MipiPatternGenerator::commentArray(
+    my @read = MipiPatternGenerator::getCommentArray(
         mode  => "extended",
         read  => 1,
         bytes => 1

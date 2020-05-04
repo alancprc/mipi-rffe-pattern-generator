@@ -393,7 +393,7 @@ fun getDataArray (Str $reg, Int $read, Int $ext = 0, Int $reg0 = 0)
     return @result;
 }
 
-=head2 commentArray
+=head2 getCommentArray
 
  return comment array for given mode, $bytes starts from 0.
  $mode:
@@ -403,7 +403,7 @@ fun getDataArray (Str $reg, Int $read, Int $ext = 0, Int $reg0 = 0)
 
 =cut
 
-fun commentArray ( Int :$bytes=0, Int :$read=0, Str :$mode="")
+fun getCommentArray ( Int :$bytes=0, Int :$read=0, Str :$mode="")
 {
     return &commentArrayReadWrite($read) unless $mode; 
     return &commentArrayReg0() if $mode =~ /reg0/i;
@@ -730,7 +730,7 @@ method writeSingleRegister ( ArrayRef $regref, ArrayRef $insref, Int :$read, Int
         $timesets[$dut] = \@tset;
 
         my @bytes = &getRegData($reg);
-        my @comment = &commentArray( read=>$read, mode=>$mode, bytes=>$#bytes );
+        my @comment = &getCommentArray( read=>$read, mode=>$mode, bytes=>$#bytes );
         $comments[$dut] = \@comment;
     }
     my @timeset = &mergeTimeSetArray(\@timesets);
