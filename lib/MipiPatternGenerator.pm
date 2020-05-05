@@ -859,6 +859,11 @@ fun mergeComment (ArrayRef $ref)
             }
         }
     }
+
+    # remove extra ", " in first element when there's a nop, since comment for
+    # nop is empty.
+    $result[0] =~ s/, //;
+
     return @result;
 }
 
