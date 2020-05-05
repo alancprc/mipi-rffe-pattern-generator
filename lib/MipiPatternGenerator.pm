@@ -46,7 +46,7 @@ our $VERSION = '0.01';
 
 =head2 new
 
- constructor
+ constructor.
 
 =cut
 
@@ -54,12 +54,12 @@ fun new ($var)
 {
     my $self = {};
     bless $self, "MipiPatternGenerator";
-    $self->setPinName( "CLK_pin", "DATA_pin" );
-    $self->setTimeSet( "tsetWrite", "tsetRead" );
     return $self;
 }
 
 =head2 dutNum
+
+ get/set DUT number.
 
 =cut
 
@@ -95,6 +95,8 @@ fun validateInputFile (Str $file)
 
 =head2 openUnoFile
 
+ open uno file to write.
+
 =cut
 
 method openUnoFile ($file)
@@ -108,6 +110,8 @@ method openUnoFile ($file)
 
 =head2 closeUnoFile
 
+ close uno file.
+
 =cut
 
 method closeUnoFile ()
@@ -117,6 +121,8 @@ method closeUnoFile ()
 }
 
 =head2 getPatternName
+
+ return pattern name.
 
 =cut
 
@@ -151,44 +157,9 @@ method printHeader ($file)
     #print $uno "SyncRef { PatRfTrig }\n\n";
 }
 
-=head2 increaseRegData
-
- increase register data only
-
-=cut
-
-fun increaseRegData (Ref $ref)
-{
-    return 0 if $$ref =~ /FF$/i;
-    my $dec = hex($$ref);
-    ++$dec;
-    $$ref = sprintf( "%X", $dec );
-}
-
-=head2 printVectors
-
-=cut
-
-method printVectors (ArrayRef $ref)
-{
-    $self->printVector($_) for @$ref;
-}
-
-=head2 printVector
-
- printVector and increase cycle number
-
-=cut
-
-method printVector (Str $vector)
-{
-    my $fh = $self->{'fh'};
-    say $fh $vector;
-}
-
 =head2 printUno
 
- print str to uno file
+ print str to uno file.
 
 =cut
 
@@ -200,7 +171,7 @@ method printUno (Str $str)
 
 =head2 replace01withLH
 
- replace 0/1 to L/H for read data
+ replace 0/1 to L/H for read data.
 
 =cut
 
@@ -214,7 +185,7 @@ fun replace01withLH (ArrayRef $dataref, Int $start, Int $len)
 
 =head2 getTimeSetArray
 
- return array for timeset
+ return timeset array.
 
 =cut
 
@@ -225,14 +196,14 @@ method getTimeSetArray (@data)
         "1" => $self->{'tsetWrite'},
         "H" => $self->{'tsetRead'},
         "L" => $self->{'tsetRead'}
-      );
+    );
     my @result = map { $tset{$_} } @data;
     return @result;
 }
 
 =head2 getClockArray
 
- return array for clock pin given data array
+ return clock array given data array.
 
 =cut
 
@@ -240,8 +211,8 @@ fun getClockArray (@data)
 {
     return @data unless $data[1];
 
-    my @result = ( "1" ) x $#data;
-    @result[0..2] = qw(0 0 0);
+    my @result = ("1") x $#data;
+    @result[ 0 .. 2 ] = qw(0 0 0);
     push @result, "0";
 
     return @result;
@@ -249,7 +220,7 @@ fun getClockArray (@data)
 
 =head2 getNopData
 
- return idle data/clock
+ return data/clock for no-operation.
 
 =cut
 
@@ -264,7 +235,7 @@ fun getNopData (Int $read, Int $ext = 0)
 
 =head2 getDataArrayReg0
 
- return data array for register 0 write command
+ return data array for register 0 write command.
 
 =cut
 
@@ -282,7 +253,7 @@ fun getDataArrayReg0 (Str $reg, $ext)
     $result[7] = 1;
 
     # Data
-    @result[8 .. 14] = &getBits( 7, &getRegData($reg) );
+    @result[ 8 .. 14 ] = &getBits( 7, &getRegData($reg) );
 
     # parity for cmd frame
     $result[15] = oddParity( @result[ 3 .. 14 ] );
@@ -293,17 +264,12 @@ fun getDataArrayReg0 (Str $reg, $ext)
     # add extra idle after bus park
     push @result, 0;
 
-    # padding to the length of register write mode
-    #@result[ 18 .. 26 ] = ("0") x 9;
-    #if ($ext) {
-    #    @result[18 .. 35] = ("0") x 18;
-    #}
     return @result;
 }
 
 =head2 getDataArray
 
- return array for data pin
+ return data array.
 
 =cut
 
@@ -326,7 +292,7 @@ fun getDataArray (Str $reg, Int $read, Int $ext = 0, Int $reg0 = 0)
     # SA
     @result[ 3 .. 6 ] = @sa;
 
-    if ( $ext ) {
+    if ($ext) {
         my @bytes = &getRegData($reg);
 
         # CMD
@@ -346,8 +312,8 @@ fun getDataArray (Str $reg, Int $read, Int $ext = 0, Int $reg0 = 0)
         push @result, "0" if $read;
 
         # Data
-        for my $byte (@bytes){
-            my @bits = &getBits( 8, $byte );
+        for my $byte (@bytes) {
+            my @bits   = &getBits( 8, $byte );
             my $parity = &oddParity(@bits);
             push @result, @bits, &oddParity(@bits);
 
@@ -395,19 +361,19 @@ fun getDataArray (Str $reg, Int $read, Int $ext = 0, Int $reg0 = 0)
 
 =head2 getCommentArray
 
- return comment array for given mode, $bytes starts from 0.
+ return comment array for given mipi mode.
+ $bytes:
+    byte count of register data, starts from 0.
  $mode:
-     default    =>  register read/write
-     extended   =>  extended register read/write
-     reg0       =>  register 0 write
+    see getMipiMode
 
 =cut
 
 fun getCommentArray ( Int :$bytes=0, Int :$read=0, Str :$mode="")
 {
-    return &commentArrayReadWrite($read) unless $mode; 
+    return &commentArrayReadWrite($read) unless $mode;
     return &commentArrayReg0() if $mode =~ /reg0/i;
-    return &commentArrayExtended($read, $bytes) if $mode =~ /extend/i;
+    return &commentArrayExtended( $read, $bytes ) if $mode =~ /extend/i;
 }
 
 =head2 commentArrayReg0
@@ -462,7 +428,7 @@ fun commentArrayReadWrite (Int $read=0)
 
 =head2 commentArrayExtended
 
- return comment array for extended mode, $bytes starts from 1.
+ return comment array for extended mode, $bytes starts from 0.
 
 =cut
 
@@ -498,7 +464,7 @@ fun commentArrayExtended (Int $read=0, Int $bytes=0)
 
 =head2 oddParity
 
- calculate odd parity bit for given array
+ calculate odd parity bit for given array.
 
 =cut
 
@@ -510,8 +476,8 @@ fun oddParity (@data)
 
 =head2 setPinName
 
- set clock/data pin name for dut.
- the dut number starts from 1.
+ set clock/data pin name for given dut.
+ dut number starts from 1.
 
 =cut
 
@@ -524,7 +490,7 @@ method setPinName (Str $clock, Str $data, $dut = 1)
 =head2 getPinName
 
  get clock/data pin name for dut.
- the dut number starts from 1.
+ dut number starts from 1.
 
 =cut
 
@@ -536,16 +502,20 @@ method getPinName ($dut = 1)
     );
 }
 
-=head2 addTriggerPin
+=head2 setTriggerPin
+
+ set trigger pin name.
 
 =cut
 
-method addTriggerPin (Str $name)
+method setTriggerPin (Str $name)
 {
     $self->{'trigger'} = $name;
 }
 
 =head2 getTriggerPin
+
+ get trigger pin name.
 
 =cut
 
@@ -556,6 +526,8 @@ method getTriggerPin ()
 
 =head2 addExtraPin
 
+ add extra pin name with default state in pattern.
+
 =cut
 
 method addExtraPin (Str $name, Str $data)
@@ -564,6 +536,8 @@ method addExtraPin (Str $name, Str $data)
 }
 
 =head2 getExtraPins
+
+ return extra pins as a list.
 
 =cut
 
@@ -576,17 +550,10 @@ method getExtraPins ()
     return @pin;
 }
 
-=head2 getDutNum
-
-=cut
-
-method getDutNum ()
-{
-    my $num = @{ $self->{'dut'} };
-    return $num;
-}
-
 =head2 getPinList
+
+ return pinlist including clock/data for all DUTs, including trigger/extra pins
+ if defined.
 
 =cut
 
@@ -625,6 +592,8 @@ method gen (Str $file)
 
 =head2 writeVectors
 
+ generate unison pattern according to pseudo pattern instructions.
+
 =cut
 
 method writeVectors (ArrayRef $ref)
@@ -659,6 +628,8 @@ method writeVectors (ArrayRef $ref)
 
 =head2 printDataInsComment
 
+ print pattern data, micro-instruction, timeset and comment to uno file.
+
 =cut
 
 method printDataInsComment (Str $data, Str $ins, Str $cmt, Str $tset = $self->{'tsetWrite'})
@@ -673,8 +644,8 @@ method printDataInsComment (Str $data, Str $ins, Str $cmt, Str $tset = $self->{'
 
 =head2 writeSingleInstruction
 
- write read/write mipi operation segment into pattern file
- reg0: register 0 write mode will be used when available.
+ write vectors for single read/write mipi instruction into pattern file.
+ reg0: register 0 write mode shall be used when available.
 
 =cut
 
@@ -702,7 +673,8 @@ method writeSingleInstruction (Str $ins, :$read, :$reg0)
 
 =head2 writeSingleRegister
 
- reg0: register 0 write mode will be used when available.
+ write vectors for single read/write mipi register operation into pattern file.
+ reg0: register 0 write mode shall be used when available.
 
 =cut
 
@@ -718,7 +690,7 @@ method writeSingleRegister ( ArrayRef $regref, ArrayRef $insref, Int :$read, Int
         my $reg = $regref->[$dut];
 
         # set mode
-        my $mode = &getMipiMode($regref, $dut, reg0=>$reg0);
+        my $mode = &getMipiMode( $regref, $dut, reg0 => $reg0 );
 
         my @data  = &getDataArray( $reg, $read, $extended, $reg0 );
         my @clock = &getClockArray(@data);
@@ -726,15 +698,16 @@ method writeSingleRegister ( ArrayRef $regref, ArrayRef $insref, Int :$read, Int
         $vecs[ 2 * $dut ] = \@clock;
         $vecs[ 2 * $dut + 1 ] = \@data;
 
-        my @tset = $self->getTimeSetArray( @data );
+        my @tset = $self->getTimeSetArray(@data);
         $timesets[$dut] = \@tset;
 
         my @bytes = &getRegData($reg);
-        my @comment = &getCommentArray( read=>$read, mode=>$mode, bytes=>$#bytes );
+        my @comment =
+          &getCommentArray( read => $read, mode => $mode, bytes => $#bytes );
         $comments[$dut] = \@comment;
     }
-    my @timeset = &mergeTimeSetArray(\@timesets);
-    my $description = &getDescription($insref, $regref);
+    my @timeset     = &mergeTimeSetArray( \@timesets );
+    my $description = &getDescription( $insref, $regref );
 
     my @comment = &mergeComment( \@comments );
     $comment[0] .= " $description";
@@ -743,19 +716,16 @@ method writeSingleRegister ( ArrayRef $regref, ArrayRef $insref, Int :$read, Int
     &transposeArrayOfArray( \@vecs );
     $self->addTriggerPinData( \@vecs );
     $self->addExtraPinData( \@vecs );
-    $self->printVectorData( \@vecs, \@timeset, \@comment );
+    $self->printDataTsetComment( \@vecs, \@timeset, \@comment );
 }
 
-=head2 printVectorData
+=head2 printDataTsetComment
 
- print vector data to uno file
-
-  0101          "comment"
- *0101* tset;   "comment"
+ print vector data/time set/comment to uno file.
 
 =cut
 
-method printVectorData (ArrayRef $dataref, ArrayRef $tsetref, ArrayRef $cmtref)
+method printDataTsetComment (ArrayRef $dataref, ArrayRef $tsetref, ArrayRef $cmtref)
 {
     for my $i ( 0 .. $#$dataref ) {
         my $data = join '', @{ $dataref->[$i] };
@@ -765,9 +735,9 @@ method printVectorData (ArrayRef $dataref, ArrayRef $tsetref, ArrayRef $cmtref)
     }
 }
 
-=head2 print
-
 =head2 addTriggerPinData
+
+ add trigger pin data to vector array.
 
 =cut
 
@@ -780,6 +750,8 @@ method addTriggerPinData ($ref)
 
 =head2 addExtraPinData
 
+ add extra pin data to vector array.
+
 =cut
 
 method addExtraPinData ($ref)
@@ -791,12 +763,12 @@ method addExtraPinData ($ref)
 
 =head2 alignVectorData
 
+ align vector data for all pins by padding "0".
+
 =cut
 
-sub alignVectorData
+fun alignVectorData (ArrayRef $ref)
 {
-    my $ref = shift;
-
     # get max length
     my @length = map { scalar @{$_} } @$ref;
     my $maxlen = max(@length);
@@ -829,7 +801,7 @@ fun alignRegWithNop (ArrayRef $ref)
 
 =head2 mergeTimeSetArray
 
- return the timeset array with max size
+ return timeset array with max size.
 
 =cut
 
@@ -851,11 +823,11 @@ fun mergeTimeSetArray ( ArrayRef $ref )
 
 =head2 mergeComment
 
- merge comment for multiple device
+ merge comment for multiple device.
 
 =cut
 
-fun mergeComment(ArrayRef $ref)
+fun mergeComment (ArrayRef $ref)
 {
     # get max length
     my @length = map { scalar @{$_} } @$ref;
@@ -876,7 +848,7 @@ fun mergeComment(ArrayRef $ref)
 
 =head2 transposeArrayOfArray
 
- transpose array of columns to array of rows
+ transpose array of columns to array of rows.
 
 =cut
 
@@ -893,7 +865,7 @@ fun transposeArrayOfArray ( ArrayRef $ref )
 
 =head2 translateInsToRegs
 
- translate instruction to array of registers of all devices
+ translate instruction to array of registers of all devices.
 
 =cut
 
@@ -929,6 +901,8 @@ method lookupRegisters (Str $ins, $dutNum)
 
 =head2 readRegisterTable
 
+ read register table for each dut and save them.
+
 =cut
 
 method readRegisterTable (ArrayRef $ref)
@@ -945,7 +919,7 @@ method readRegisterTable (ArrayRef $ref)
         # remove trailing new line
         chomp @content;
         s/\s+//g for @content;
-        s/\R//g for @content;
+        s/\R//g  for @content;
 
         my @addr = split /,/, shift @content;
         shift @addr;
@@ -967,6 +941,8 @@ method readRegisterTable (ArrayRef $ref)
 
 =head2 getIdleVectorData
 
+ return idle vector data for stop/wait/jmp/trig.
+
 =cut
 
 method getIdleVectorData ($trigger=0)
@@ -984,8 +960,8 @@ method getIdleVectorData ($trigger=0)
 
 =head2 parsePseudoPattern
 
- read pseudo pattern file, translate states to register read/write operation by
- lookup the register table
+ the pseudo pattern file contains two parts, config and instructions.  this
+ function will read file and setup with config part, then return instructions.
 
 =cut
 
@@ -1034,7 +1010,7 @@ method parsePseudoPattern ($file)
     $line =~ s/\s//g;
     $line =~ s/.*://g;
     my $trigger = $line;
-    $self->addTriggerPin($trigger) unless $trigger eq "None";
+    $self->setTriggerPin($trigger) unless $trigger eq "None";
 
     # extra
     $line = shift @data;
@@ -1079,13 +1055,15 @@ method parsePseudoPattern ($file)
 
 =head2 isExtended
 
+ return true if register requires extended mode.
+
 =cut
 
 fun isExtended ( Str $reg )
 {
     return 0 if $reg eq "nop";
 
-    my $addr = hex (&getRegAddr($reg));
+    my $addr = hex( &getRegAddr($reg) );
     return 1 if $addr > 0x1F and $addr <= 0xff;
     my @data = &getRegData($reg);
     return 1 if @data > 1;
@@ -1094,6 +1072,8 @@ fun isExtended ( Str $reg )
 }
 
 =head2 isReg0WriteMode
+
+ return true if register can be written with register 0 write mode.
 
 =cut
 
@@ -1128,6 +1108,10 @@ fun getMipiMode (ArrayRef $regref, Int $dut, Int :$reg0)
 
 =head2 printTriggerVector
 
+ print a vector with trigger.  when trigger pin is defined, it's set to 1.
+ otherwise, pattern trigger will be assumed and a '[TRIG]' will be added as
+ micro-instruction.
+
 =cut
 
 method printTriggerVector ()
@@ -1140,7 +1124,7 @@ method printTriggerVector ()
 
 =head2 getSlaveAddr
 
- return slave address in Str.
+ return slave address for given register.
 
 =cut
 
@@ -1157,6 +1141,8 @@ fun getSlaveAddr (Str $reg)
 
 =head2 getRegAddr
 
+ return register address for given register.
+
 =cut
 
 fun getRegAddr (Str $reg)
@@ -1172,6 +1158,8 @@ fun getRegAddr (Str $reg)
 }
 
 =head2 getRegData
+
+ return register data as a LIST for given register.
 
 =cut
 
@@ -1190,14 +1178,20 @@ fun getRegData (Str $reg)
 
 =head2 getBits
 
+ return list of bits(MSB first) for given hex string.
+
 =cut
 
-fun getBits(Int $bitNum, Str $reg)
+fun getBits (Int $bitNum, Str $reg)
 {
     return split "", sprintf( "%0${bitNum}b", hex($reg) );
 }
 
 =head2 getDescription
+
+ return description for instruction/register for all DUTs.
+ if instruction is the same with register, starting with '0x', only instruction
+ will be kept.
 
 =cut
 
@@ -1207,7 +1201,7 @@ fun getDescription (ArrayRef $insref,ArrayRef $regref)
     for my $dut ( 0 .. $#$regref ) {
         if ( $insref->[$dut] eq $regref->[$dut] ) {
             $result[$dut] =
-              sprintf( "%d:%s", $dut + 1, $insref->[$dut]);
+              sprintf( "%d:%s", $dut + 1, $insref->[$dut] );
         } else {
             $result[$dut] =
               sprintf( "%d:%s:%s", $dut + 1, $insref->[$dut], $regref->[$dut] );

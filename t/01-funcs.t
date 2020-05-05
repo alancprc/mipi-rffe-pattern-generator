@@ -86,17 +86,6 @@ isa_ok( $mipi, "MipiPatternGenerator" );
     is( join( "", @read ), join( "", @exp ), "read comment" );
 }
 
-# increase data
-{
-    my $reg = "E0089";
-    MipiPatternGenerator::increaseRegData( \$reg );
-    is( $reg, "E008A", "increase hex data" );
-
-    $reg = "E00FF";
-    MipiPatternGenerator::increaseRegData( \$reg );
-    is( $reg, "E00FF", "increase hex data 0xff" );
-}
-
 done_testing();
 
 diag("Testing MipiPatternGenerator $MipiPatternGenerator::VERSION, Perl $], $^X"
