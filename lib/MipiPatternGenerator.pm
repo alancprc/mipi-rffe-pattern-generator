@@ -915,8 +915,10 @@ method lookupRegisters (Str $ins, $dutNum)
     return $ins if $ins eq "nop";
     return $ins if $ins =~ /0x\w+/i;
 
-    die "there's no $ins in registerTable."
+    die
+"there's no entry for $ins in register table. check register table and line starts with 'RegisterTable:' in input file.\n"
       unless $self->{'table'}->[$dutNum]->{$ins};
+
     return @{ $self->{'table'}->[$dutNum]->{$ins} };
 }
 
@@ -928,12 +930,14 @@ method lookupRegisters (Str $ins, $dutNum)
 
 method readRegisterTable (ArrayRef $ref)
 {
+    return unless @$ref;
+
     die "RegisterTable file number is not equal to dut number."
       unless $self->dutNum == @$ref;
 
     for my $dut ( 0 .. $self->dutNum - 1 ) {
         my $fn = $ref->[$dut];
-        open my $fh, "<", $fn or die "fail to open $fn for read: $!";
+        open my $fh, "<", $fn or warn "fail to open $fn for read: $!" and next;
         my @content = <$fh>;
         close $fh;
 
