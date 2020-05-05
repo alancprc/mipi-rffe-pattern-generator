@@ -712,8 +712,14 @@ method writeSingleRegister ( ArrayRef $regref, ArrayRef $insref, Int :$read, Int
         $timesets[$dut] = \@tset;
 
         my @bytes = &getRegData($reg);
-        my @comment =
-          &getCommentArray( read => $read, mode => $mode, bytes => $#bytes );
+        my @comment;
+        if ( $reg ne "nop" ) {
+            @comment = &getCommentArray(
+                read  => $read,
+                mode  => $mode,
+                bytes => $#bytes
+            );
+        }
         $comments[$dut] = \@comment;
     }
     my @timeset     = &mergeTimeSetArray( \@timesets );
