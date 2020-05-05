@@ -224,22 +224,18 @@ fun getClockArray (@data)
 
 =cut
 
-fun getNopData (Int $read, Int $ext = 0)
+fun getNopData ()
 {
-    my $numZero = 3;
-    my $numOne  = $ext ? 32 : 23;
-    my $numIdle = 1;
-
-    return ("0") x ( $numZero + $numOne + $read + $numIdle );
+    return ("0");
 }
 
 =head2 getDataArrayReg0
 
- return data array for register 0 write command.
+ return data array for register 0 write mode.
 
 =cut
 
-fun getDataArrayReg0 (Str $reg, $ext)
+fun getDataArrayReg0 (Str $reg)
 {
     my @result;
 
@@ -256,7 +252,60 @@ fun getDataArrayReg0 (Str $reg, $ext)
     @result[ 8 .. 14 ] = &getBits( 7, &getRegData($reg) );
 
     # parity for cmd frame
-    $result[15] = oddParity( @result[ 3 .. 14 ] );
+    $result[15] = &oddParity( @result[ 3 .. 14 ] );
+
+    # add bus park
+    push @result, 0;
+
+    # add extra idle after bus park
+    push @result, 0;
+
+    return @result;
+}
+
+=head2 getDataArrayExtended
+
+ return data array for extended mode.
+
+=cut
+
+fun getDataArrayExtended (Str $reg, Int $read)
+{
+    my @addr = &getBits( 8, &getRegAddr($reg) );
+    my @result;
+
+    # SSC
+    @result[ 0 .. 2 ] = qw(0 1 0);
+
+    # SA
+    @result[ 3 .. 6 ] = &getBits( 4, &getSlaveAddr($reg) );
+
+    # CMD
+    @result[ 7 .. 10 ] = ( 0, 0, $read, 0 );
+
+    # BC
+    my @bytes = &getRegData($reg);
+    @result[ 11 .. 14 ] = split //, sprintf( "%04b", $#bytes );
+
+    # parity for cmd
+    $result[15] = &oddParity( @result[ 3 .. 14 ] );
+
+    # Addr
+    push @result, @addr;
+    push @result, &oddParity(@addr);
+
+    # bus park if read
+    push @result, "0" if $read;
+
+    # Data
+    for my $byte (@bytes) {
+        my @bits   = &getBits( 8, $byte );
+        my $parity = &oddParity(@bits);
+        push @result, @bits, &oddParity(@bits);
+
+        # replace data and parity with expected logic if read
+        &replace01withLH( \@result, -9, 9 ) if $read;
+    }
 
     # add bus park
     push @result, 0;
@@ -273,88 +322,50 @@ fun getDataArrayReg0 (Str $reg, $ext)
 
 =cut
 
-fun getDataArray (Str $reg, Int $read, Int $ext = 0, Int $reg0 = 0)
+fun getDataArray (Str $reg, Int $read, Str $mode="")
 {
     # for nop
-    return &getNopData( $read, $ext ) if $reg eq "nop";
+    return &getNopData() if $reg eq "nop";
 
-    my @sa   = &getBits( 4, &getSlaveAddr($reg) );
-    my @addr = &getBits( 8, &getRegAddr($reg) );
+    # for register 0 write
+    return &getDataArrayReg0($reg) if $mode eq "reg0";
+
+    # for extended mode
+    return &getDataArrayExtended( $reg, $read ) if $mode eq "extended";
+
+    # for register read/write mode
     my @result;
-
-    if ( $reg0 and &isReg0WriteMode($reg) ) {
-        return &getDataArrayReg0( $reg, $ext );
-    }
 
     # SSC
     @result[ 0 .. 2 ] = qw(0 1 0);
 
     # SA
-    @result[ 3 .. 6 ] = @sa;
-
-    if ($ext) {
-        my @bytes = &getRegData($reg);
-
-        # CMD
-        @result[ 7 .. 10 ] = ( 0, 0, $read, 0 );
-
-        # BC
-        @result[ 11 .. 14 ] = split //, sprintf( "%04b", $#bytes );
-
-        # parity for cmd
-        $result[15] = oddParity( @result[ 3 .. 14 ] );
-
-        # Addr
-        push @result, @addr;
-        push @result, oddParity(@addr);
-
-        # bus park if read
-        push @result, "0" if $read;
-
-        # Data
-        for my $byte (@bytes) {
-            my @bits   = &getBits( 8, $byte );
-            my $parity = &oddParity(@bits);
-            push @result, @bits, &oddParity(@bits);
-
-            # replace data and parity with expected logic if read
-            &replace01withLH( \@result, -9, 9 ) if $read;
-        }
-
-        # add bus park
-        push @result, 0;
-
-        # add extra idle after bus park
-        push @result, 0;
-
-        return @result;
-    }
-    my @data = &getBits( 8, &getRegData($reg) );
+    @result[ 3 .. 6 ] = &getBits( 4, &getSlaveAddr($reg) );
 
     # CMD
     @result[ 7 .. 9 ] = ( 0, 1, $read );
 
     # Addr
-    @result[ 10 .. 14 ] = @addr[ 3 .. 7 ];
+    @result[ 10 .. 14 ] = &getBits( 5, &getRegAddr($reg) );
 
     # parity for cmd
-    $result[15] = oddParity( @result[ 3 .. 14 ] );
+    $result[15] = &oddParity( @result[ 3 .. 14 ] );
+
+    # bus park if read
+    push @result, "0" if $read;
 
     # Data
-    @result[ 16 .. 23 ] = @data;
-    $result[24] = oddParity(@data);
+    my @data = &getBits( 8, &getRegData($reg) );
+    push @result, @data, &oddParity(@data);
 
     # replace data and parity with expected logic if read
-    &replace01withLH( \@result, 16, 9 ) if $read;
+    &replace01withLH( \@result, -9, 9 ) if $read;
 
     # add bus park
     push @result, 0;
 
     # add extra idle after bus park
     push @result, 0;
-
-    # bus park if read
-    splice @result, 16, 0, 0 if $read;
 
     return @result;
 }
@@ -683,7 +694,6 @@ method writeSingleRegister ( ArrayRef $regref, ArrayRef $insref, Int :$read, Int
 
     my @vecs;
     my @description;
-    my $extended = grep { &isExtended($_) } @$regref;
     my @timesets;
     my @comments;
     for my $dut ( 0 .. $self->dutNum - 1 ) {
@@ -692,7 +702,7 @@ method writeSingleRegister ( ArrayRef $regref, ArrayRef $insref, Int :$read, Int
         # set mode
         my $mode = &getMipiMode( $regref, $dut, reg0 => $reg0 );
 
-        my @data  = &getDataArray( $reg, $read, $extended, $reg0 );
+        my @data  = &getDataArray( $reg, $read, $mode );
         my @clock = &getClockArray(@data);
 
         $vecs[ 2 * $dut ] = \@clock;
