@@ -1,23 +1,21 @@
 # the number of device. should be successive and start from 1.
 DUT: 1, 2
 
-# the name for clock pin for each device.
+# the name for clock/data pin for each device.
 ClockPinName: CLK_pin, CLK2_pin
-
-# the name for data pin for each device.
 DataPinName: DATA_pin, DATA2_pin
 
-# the name for trigger pin. leave blank if no trigger pin needed.
+# the name for trigger pin. leave it blank if no trigger pin needed.
 TriggerPinName: FX_TRIGGER_pin
 
 # the name for extra pins, separated by ',' for multiple pin.
-# leave blank if no extra pins needed.
+# leave it blank if you don't need it.
 # the format is: <pin name>=<default logic state>
 # e.g.: 'vramp=1' will add pin "vramp" to uno pattern, with logic state '1';
 ExtraPinName: VRAMP_pin=0
 
 # the csv file name for each device.
-RegisterTable: regtable_dut1.csv, regtable_dut1.csv
+RegisterTable: regtable_dut1.csv, regtable_dut2.csv
 
 # the waveform reference for read/write cycle
 WaveformRefRead: TS13MHz
@@ -32,20 +30,18 @@ WaveformRefWrite: TS26MHz
 #  directive        -   micro instruction in Unison Pattern
 #   wait N          -   <RPT N>
 #   trig            -   <TRIG>
+#   wait            -   no micro-instruction
 #   jmp label_name  -   <JMP label_name>
 #   stop            -   <STOP>
+#
+# Note:
+# 1. 'wait' equals 'wait 1' except that <RPT 1> is ommited.
+# 2. 'nop' means no-operation. the clock/data will keep '0'.  and 'nop' on the
+#    right most can be ommited. 
 ################################################################################
-#
-# Note: 'wait' equals 'wait 1' except that <RPT 1> is ommited.
-#
-# 'nop' means no-operation. the clock/data will keep '0'.
-# and 'nop' on the right most can be ommited. so the following
-#   'REG1, REG2, nop, nop, nop'
-# can be simplified as
-#   'REG1, REG2'
-# while
-#   'nop, nop, nop, REG1, REG2'
-# cannot be simplified.
+
+# it's designed to be used to config multiple devices at the same time,
+# with/without the registable.
 
 # Pattern label.
 Label: Leak_LB_HPM
@@ -60,12 +56,11 @@ Label: Leak_LB_HPM
 # send write command to device 1.
 # 'LB_GMSK_HPM' is a certain state representing a set of registers in register
 # table specified in 'RegisterTable:'
-# e.g.: LB_GMSK_HPM = 0xE1C38,0xE0014,0xE020F,0xE0408,0xE0500
+# e.g.: LB_GMSK_HPM = 0xE1C38,0xE0014,0xE020F,0xE0408,0xE0500 for dut1
     LB_GMSK_HPM
 
 # read operation needs explicite specified by 'R:' at the very beginning on the
 # line followed by registers.
-R:  0xE1C38
 R:  LB_GMSK_HPM
     trig
     wait 200
@@ -84,8 +79,7 @@ Label: Leak_HB_HPM
     
 Label: L_TRX1
 # 1st DUT keeps idle, here the 'nop' is necessary.
-    nop, 0xE1C38
-    nop, L_TRX0
+    nop, L_TRX1
     wait10
     trig
     wait200
@@ -95,3 +89,30 @@ Label: L_TRX1
 
 # stop pattern
     stop
+
+
+# and it's also designed to do mipi function test like the following
+
+# read default value
+R:  0xE1C01
+R:  0xE1D02
+R:  0xE1E03
+
+    0xE1C38
+
+# register 0 write mode if possible
+0:  0xE007F
+    0xE007F
+
+# register 0 write mode is not applicable for address 0x02 though '0:'
+# specified.
+0:  0xE027F
+
+# extended mode.
+    0xE2F2F
+R:  0xE2F2F
+
+# extended mode with multiple bytes data write/read.
+    0xE2F:00-11-22-33
+R:  0xE2F:00-11-22-33
+
