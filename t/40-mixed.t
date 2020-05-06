@@ -25,14 +25,14 @@ print $fh $reg;
 close $fh;
 
 my $txt = <<EOF;
-DUT: 1, 2, 3
-ClockPinName: clk1, clk2, clk3
-DataPinName: data1, data2, data3
-TriggerPinName: 
-ExtraPinName: 
-RegisterTable: t/$fn.csv, t/$fn.csv, t/$fn.csv
-WaveformRefRead: r
-WaveformRefWrite: W
+DUT= 1, 2, 3
+ClockPinName= clk1, clk2, clk3
+DataPinName= data1, data2, data3
+TriggerPinName= 
+ExtraPinName= 
+RegisterTable= t/$fn.csv, t/$fn.csv, t/$fn.csv
+WaveformRefRead= r
+WaveformRefWrite= W
 
 0:  0xE0011,0xE1C38
     0xE0011,0xE1C38
