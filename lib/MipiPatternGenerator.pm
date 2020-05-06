@@ -12,6 +12,7 @@ use File::Spec;
 use File::Path qw(make_path remove_tree);
 use Carp qw(croak carp);
 use List::Util qw(max min);
+use Config::General qw(ParseConfig);
 
 use Exporter qw(import);
 our @EXPORT = qw();
@@ -590,7 +591,8 @@ method getPinList ()
 method gen (Str $file)
 {
     &validateInputFile($file);
-    my @ins = $self->parsePseudoPattern($file);
+    $self->parseConfigFile($file);
+    my @ins = &getInstructions($file);
 
     $self->openUnoFile($file);
 
@@ -983,14 +985,72 @@ method getIdleVectorData ($trigger=0)
     return $vec;
 }
 
-=head2 parsePseudoPattern
+=head2 parseConfigFile
 
  the pseudo pattern file contains two parts, config and instructions.  this
  function will read file and setup with config part, then return instructions.
 
 =cut
 
-method parsePseudoPattern ($file)
+method parseConfigFile ($file)
+{
+    my %conf = ParseConfig( -ConfigFile => $file, -LowerCaseNames => 1 );
+
+    # dut number
+    die "missing 'DUT' line in $file." unless $conf{'dut'};
+    my $dutnum = () = split /,\s*/, $conf{'dut'}, -1;
+    $self->dutNum($dutnum);
+
+    # clock
+    die "missing 'ClockPinName' line in $file." unless $conf{clockpinname};
+    my @clockpins = split /,\s*/, $conf{clockpinname};
+
+    # data
+    die "missing 'DataPinName' line in $file." unless $conf{datapinname};
+    my @datapins = split /,\s*/, $conf{datapinname};
+
+    die "clock/data pin number does not match!" unless @clockpins == @datapins;
+    for my $i ( 0 .. @clockpins - 1 ) {
+        $self->setPinName( $clockpins[$i], $datapins[$i], $i + 1 );
+    }
+
+    # trigger, optional
+    die "missing 'TriggerPinName' line in $file." unless exists $conf{triggerpinname};
+    my $trigger = $conf{triggerpinname};
+    $self->setTriggerPin($trigger);
+
+    # extra, optional
+    die "missing 'ExtraPinName' line in $file." unless exists $conf{extrapinname};
+    my @extra = split /,\s*/, $conf{extrapinname};
+    for (@extra) {
+        my ( $pin, $value ) = split /\s*=\s*/;
+        $self->addExtraPin( $pin, $value );
+    }
+
+    # registerTable, optional for mipi function
+    die "missing 'RegisterTable:' line in $file." unless exists $conf{registertable};
+    my @regtable = split /,\s*/,  $conf{registertable};
+    $self->readRegisterTable( \@regtable );
+
+    # waveform ref
+    die "missing 'WaveformRefRead' line in $file."
+      unless $conf{waveformrefread};
+    my $read = $conf{waveformrefread};
+
+    die "missing 'WaveformRefWrite' line in $file."
+      unless $conf{waveformrefwrite};
+    my $write = $conf{waveformrefwrite};
+
+    $self->setTimeSet( $write, $read );
+}
+
+=head2 getInstructions
+
+ get instructions from config file.
+
+=cut
+
+fun getInstructions(Str $file)
 {
     open( my $fh, "<", $file ) or die "fail to open $file for read: $!";
     my @data = <$fh>;
@@ -999,81 +1059,8 @@ method parsePseudoPattern ($file)
     chomp @data;
     s/\R//g for @data;
 
-    @data = grep !/^\s*#|^\s*$/, @data;
+    @data = grep !/^\s*#|^\s*$|=/, @data;
     die "$file is empty!" unless @data;
-
-    # dut number
-    my $line = shift @data;
-    die "missing 'DUT:' line in $file." unless $line =~ /^DUT:/;
-    my $num = () = split /,/, $line, -1;
-    $self->dutNum($num);
-
-    # clock
-    $line = shift @data;
-    die "missing 'ClockPinName:' line in $file."
-      unless $line =~ /^ClockPinName:/;
-    $line =~ s/\s//g;
-    $line =~ s/.*://g;
-    my @clockpins = split /,/, $line;
-
-    # data
-    $line = shift @data;
-    die "missing 'DataPinName:' line in $file." unless $line =~ /^DataPinName:/;
-    $line =~ s/\s//g;
-    $line =~ s/.*://g;
-    my @datapins = split /,/, $line;
-
-    die "clock/data pin number does not match!" unless @clockpins == @datapins;
-    for my $i ( 0 .. @clockpins - 1 ) {
-        $self->setPinName( $clockpins[$i], $datapins[$i], $i + 1 );
-    }
-
-    # trigger
-    $line = shift @data;
-    die "missing 'TriggerPinName:' line in $file."
-      unless $line =~ /^TriggerPinName:/;
-    $line =~ s/\s//g;
-    $line =~ s/.*://g;
-    my $trigger = $line;
-    $self->setTriggerPin($trigger) unless $trigger eq "None";
-
-    # extra
-    $line = shift @data;
-    die "missing 'ExtraPinName:' line in $file."
-      unless $line =~ /^ExtraPinName:/;
-    $line =~ s/\s//g;
-    $line =~ s/.*://g;
-    my @extra = split /,/, $line;
-    for (@extra) {
-        my ( $pin, $value ) = split /=/;
-        $self->addExtraPin( $pin, $value );
-    }
-
-    # registerTable
-    $line = shift @data;
-    die "missing 'RegisterTable:' line in $file."
-      unless $line =~ /^RegisterTable:/;
-    $line =~ s/\s//g;
-    $line =~ s/.*://g;
-    my @regtable = split /,/, $line;
-    $self->readRegisterTable( \@regtable );
-
-    # waveform ref
-    $line = shift @data;
-    die "missing 'WaveformRefRead:' line in $file."
-      unless $line =~ /^WaveformRefRead:/;
-    $line =~ s/\s//g;
-    $line =~ s/.*://g;
-    my $read = $line;
-
-    $line = shift @data;
-    die "missing 'WaveformRefWrite' line in $file."
-      unless $line =~ /^WaveformRefWrite:/;
-    $line =~ s/\s//g;
-    $line =~ s/.*://g;
-    my $write = $line;
-
-    $self->setTimeSet( $write, $read );
 
     return @data;
 }
