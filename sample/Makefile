@@ -17,5 +17,5 @@ ${TARBALL} : ${TARGET} sample.txt sample.uno regtable_dut1.csv regtable_dut2.csv
 	tar tzf $@
 
 clean :
-	rm -f ${TARGET} ${TARBALL}
+	rm -f mipiPatternGenerator_*
 
