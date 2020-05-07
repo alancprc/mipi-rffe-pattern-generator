@@ -1,7 +1,11 @@
 #!/usr/bin/env perl
-use 5.010001;
+use v5.14;
 use strict;
 use warnings;
+
+# use module under current directory.
+use FindBin 1.51 qw( $RealBin );
+use lib $RealBin;
 
 use MipiPatternGenerator;
 
