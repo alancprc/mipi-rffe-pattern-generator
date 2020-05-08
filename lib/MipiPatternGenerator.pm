@@ -998,18 +998,21 @@ method parseConfigFile ($file)
 
     # dut number
     die "missing 'DUT' line in $file." unless $conf{'dut'};
-    my $dutnum = () = split /,\s*/, $conf{'dut'}, -1;
-    $self->dutNum($dutnum);
+    die "DUT number shall >= 1" unless $conf{'dut'} > 0;
+    $self->dutNum( $conf{'dut'} );
 
     # clock
     die "missing 'ClockPinName' line in $file." unless $conf{clockpinname};
     my @clockpins = split /,\s*/, $conf{clockpinname};
+    die "clock pin number shall match with DUT number"
+      unless @clockpins == $self->dutNum();
 
     # data
     die "missing 'DataPinName' line in $file." unless $conf{datapinname};
     my @datapins = split /,\s*/, $conf{datapinname};
+    die "data pin number shall match with DUT number"
+      unless @datapins == $self->dutNum();
 
-    die "clock/data pin number does not match!" unless @clockpins == @datapins;
     for my $i ( 0 .. @clockpins - 1 ) {
         $self->setPinName( $clockpins[$i], $datapins[$i], $i + 1 );
     }
@@ -1023,7 +1026,7 @@ method parseConfigFile ($file)
     die "missing 'ExtraPinName' line in $file." unless exists $conf{extrapinname};
     my @extra = split /,\s*/, $conf{extrapinname};
     for (@extra) {
-        my ( $pin, $value ) = split /\s*=\s*/;
+        my ( $pin, $value ) = split /\s*:\s*/;
         $self->addExtraPin( $pin, $value );
     }
 

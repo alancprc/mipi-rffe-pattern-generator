@@ -25,7 +25,7 @@ print $fh $reg;
 close $fh;
 
 my $txt = <<EOF;
-DUT= 1, 2, 3
+DUT= 3
 ClockPinName= clk1, clk2, clk3
 DataPinName= data1, data2, data3
 TriggerPinName= 

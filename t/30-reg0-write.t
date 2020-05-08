@@ -25,7 +25,7 @@ close $fh;
 
 my $txt = <<EOF;
 # the number of device. should be successive and start from 1.
-DUT= 1, 2
+DUT= 2
 
 # the name for clock pin for each device.
 ClockPinName= clk1, clk2
@@ -40,7 +40,7 @@ TriggerPinName= fx_trigger
 # leave blank if no extra pins needed.
 # the format is: <pin name>=<default logic state>
 # e.g.: 'vramp=1' will add pin "vramp" to uno pattern, with logic state '1';
-ExtraPinName= vramp=0,dummy=1
+ExtraPinName= vramp:0,dummy:1
 
 # the csv file name for each device.
 RegisterTable= t/reg_reg0_write.csv, t/reg_reg0_write.csv
