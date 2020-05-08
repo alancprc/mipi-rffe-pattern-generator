@@ -626,7 +626,7 @@ method writeVectors (ArrayRef $ref)
                 "jump" );
         } elsif (/^\s*trig/i) {
             $self->printTriggerVector();
-        } elsif (/^\s*(R:|0:)?\s*(\w+\s*(?:,\s*\w+)*.*)$/) {    # read/write
+        } elsif (/^\s*(R:|0:|0:00)?\s*(\w+\s*(?:,\s*\w+)*.*)$/) {    # read/write
             my ( $read, $reg0 ) = ( 0, 0 );
             $read = 1 if $1 and $1 eq "R:";
             $reg0 = 1 if $1 and $1 eq "0:";
@@ -996,6 +996,16 @@ method parseConfigFile ($file)
 {
     my %conf = ParseConfig( -ConfigFile => $file, -LowerCaseNames => 1 );
 
+    # remove trailing commas or spaces
+    while ( my ( $key, $val ) = each %conf ) {
+        next unless $val;
+        next if ref $val;
+        $val =~ s/\s*,\s*/,/g;
+        $val =~ s/(\s|,)+$//g;
+        $val =~ s/^\s*,//;
+        $conf{$key} = $val;
+    }
+
     # dut number
     die "missing 'DUT' line in $file." unless $conf{'dut'};
     die "DUT number shall >= 1" unless $conf{'dut'} > 0;
@@ -1003,13 +1013,13 @@ method parseConfigFile ($file)
 
     # clock
     die "missing 'ClockPinName' line in $file." unless $conf{clockpinname};
-    my @clockpins = split /,\s*/, $conf{clockpinname};
+    my @clockpins = split /\s*,\s*/, $conf{clockpinname};
     die "clock pin number shall match with DUT number"
       unless @clockpins == $self->dutNum();
 
     # data
     die "missing 'DataPinName' line in $file." unless $conf{datapinname};
-    my @datapins = split /,\s*/, $conf{datapinname};
+    my @datapins = split /\s*,\s*/, $conf{datapinname};
     die "data pin number shall match with DUT number"
       unless @datapins == $self->dutNum();
 
@@ -1024,7 +1034,7 @@ method parseConfigFile ($file)
 
     # extra, optional
     die "missing 'ExtraPinName' line in $file." unless exists $conf{extrapinname};
-    my @extra = split /,\s*/, $conf{extrapinname};
+    my @extra = split /\s*,\s*/, $conf{extrapinname};
     for (@extra) {
         my ( $pin, $value ) = split /\s*:\s*/;
         $self->addExtraPin( $pin, $value );
@@ -1032,7 +1042,7 @@ method parseConfigFile ($file)
 
     # registerTable, optional for mipi function
     die "missing 'RegisterTable:' line in $file." unless exists $conf{registertable};
-    my @regtable = split /,\s*/,  $conf{registertable};
+    my @regtable = split /\s*,\s*/,  $conf{registertable};
     $self->readRegisterTable( \@regtable );
 
     # waveform ref
@@ -1065,7 +1075,20 @@ fun getInstructions(Str $file)
     @data = grep !/^\s*#|^\s*$|=/, @data;
     die "$file is empty!" unless @data;
 
-    return @data;
+    my @result;
+    for my $line ( @data ) {
+        next unless $line;
+        next if $line =~ /^#/;
+        $line =~ s/\s*,\s*/,/g;
+        $line =~ s/(\s|,)+$//g;
+        push @result, $line if $line;
+    }
+
+    # remove the first comma for csv file config file
+    if ( $file =~ /\.csv$/ ) {
+        s/,// for @result;
+    }
+    return @result;
 }
 
 =head2 isExtended

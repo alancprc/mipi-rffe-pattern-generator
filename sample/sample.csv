@@ -1,0 +1,41 @@
+﻿DUT=             ,2,
+ClockPinName=    ,CLK_pin           ,CLK2_pin
+DataPinName=     ,DATA_pin          ,DATA2_pin
+RegisterTable=   ,regtable_dut1.csv ,regtable_dut2.csv
+TriggerPinName=  ,FX_TRIGGER_pin    ,
+ExtraPinName=    ,VRAMP_pin:0       ,dummy_pin : 1
+WaveformRefRead= ,TS13MHz           ,
+WaveformRefWrite=,TS26MHz           ,
+                 ,                  ,
+Label:           ,Leak_LB_HPM       ,
+                 ,0xE1C38           ,
+LB_GMSK_HPM      ,,
+R:               ,LB_GMSK_HPM       ,
+                 ,trig              ,
+                 ,wait200           ,
+                 ,wait              ,
+                 ,jmp L_TRX1        ,
+                 ,,
+Label:           ,Leak_HB_HPM       ,
+                 ,HB_GMSK_HPM       ,nop
+                 ,trig              ,
+                 ,wait200           ,
+                 ,,
+Label:           ,L_TRX1            ,
+                 ,nop               ,L_TRX1
+                 ,wait10            ,
+                 ,trig              ,
+                 ,wait200           ,
+                 ,dpxiso@LTRx1_MTRx1,
+                 ,stop              ,
+R:               ,0xE1C01           ,0xE1C01           
+R:               ,0xE1D02           ,0xE1D02           
+R:               ,0xE1E03           ,0xE1E03           
+                 ,0xE1C38           ,0xE1C38           
+0:,0xE007F           ,0xE007F           
+                 ,0xE007F           ,0xE007F           
+0:,0xE027F           ,0xE027F           
+                 ,0xE2F2F           ,0xE2F2F           
+R:               ,0xE2F2F           ,0xE2F2F           
+                 ,0xE2F:00-11-22-33 ,0xE2F:00-11-22-33 
+R:               ,0xE2F:00-11-22-33 ,0xE2F:00-11-22-33 
