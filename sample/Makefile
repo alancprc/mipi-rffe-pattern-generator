@@ -18,8 +18,8 @@ ${TARBALL} : ${TARGET} sample.cfg sample.uno regtable_dut1.csv regtable_dut2.csv
 	tar tzf $@
 
 release :
-	rm -f ${RELEASE}/mipiPatternGenerator_*.tar.gz
-	cp -at ${RELEASE} ${TARGET}
+	rm -f ${RELEASE}/mipiPatternGenerator_*
+	cp -at ${RELEASE} ${TARBALL}
 
 
 clean :
