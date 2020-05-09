@@ -13,7 +13,7 @@ ${TARGET} : ${PM}
 	pp -f Crypto -F Crypto -M Filter::Crypto::Decrypt \
 		-o ${TARGET} -x --xargs sample.cfg run.pl
 
-${TARBALL} : ${TARGET} sample.cfg sample.uno regtable_dut1.csv regtable_dut2.csv
+${TARBALL} : ${TARGET} sample.csv sample.cfg sample.uno regtable_dut1.csv regtable_dut2.csv
 	tar czf $@ $^
 	tar tzf $@
 
