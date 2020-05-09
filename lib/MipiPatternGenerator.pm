@@ -317,6 +317,61 @@ fun getDataArrayExtended (Str $reg, Int $read)
     return @result;
 }
 
+=head2 getDataArrayLong
+
+ return data array for long mode.
+
+=cut
+
+fun getDataArrayLong (Str $reg, Int $read)
+{
+    my @addr = &getBits( 16, &getRegAddr($reg) );
+    my @result;
+
+    # SSC
+    @result[ 0 .. 2 ] = qw(0 1 0);
+
+    # SA
+    @result[ 3 .. 6 ] = &getBits( 4, &getSlaveAddr($reg) );
+
+    # CMD
+    @result[ 7 .. 11 ] = ( 0, 0, 1, 1, $read );
+
+    # BC
+    my @bytes = &getRegData($reg);
+    @result[ 12 .. 14 ] = split //, sprintf( "%03b", $#bytes );
+
+    # parity for cmd
+    $result[15] = &oddParity( @result[ 3 .. 14 ] );
+
+    # Addr
+    push @result, @addr[0..7];
+    push @result, &oddParity(@addr[0..7]);
+    push @result, @addr[8..15];
+    push @result, &oddParity(@addr[8..15]);
+
+    # bus park if read
+    push @result, "0" if $read;
+
+    # Data
+    for my $byte (@bytes) {
+        my @bits   = &getBits( 8, $byte );
+        my $parity = &oddParity(@bits);
+        push @result, @bits, &oddParity(@bits);
+
+        # replace data and parity with expected logic if read
+        &replace01withLH( \@result, -9, 9 ) if $read;
+    }
+
+    # add bus park
+    push @result, 0;
+
+    # add extra idle after bus park
+    push @result, 0;
+
+    return @result;
+}
+
 =head2 getDataArray
 
  return data array.
@@ -333,6 +388,9 @@ fun getDataArray (Str $reg, Int $read, Str $mode="")
 
     # for extended mode
     return &getDataArrayExtended( $reg, $read ) if $mode eq "extended";
+
+    # for long mode
+    return &getDataArrayLong( $reg, $read ) if $mode eq "long";
 
     # for register read/write mode
     my @result;
@@ -384,8 +442,9 @@ fun getDataArray (Str $reg, Int $read, Str $mode="")
 fun getCommentArray ( Int :$bytes=0, Int :$read=0, Str :$mode="")
 {
     return &commentArrayReadWrite($read) unless $mode;
-    return &commentArrayReg0() if $mode =~ /reg0/i;
-    return &commentArrayExtended( $read, $bytes ) if $mode =~ /extend/i;
+    return &commentArrayReg0() if $mode eq "reg0";
+    return &commentArrayExtended( $read, $bytes ) if $mode eq "extended";
+    return &commentArrayLong( $read, $bytes ) if $mode eq "long";
 }
 
 =head2 commentArrayReg0
@@ -455,6 +514,46 @@ fun commentArrayExtended (Int $read=0, Int $bytes=0)
       DataAddr7 DataAddr6 DataAddr5 DataAddr4
       DataAddr3 DataAddr2 DataAddr1 DataAddr0
       ParityAddr);
+
+    push @result, "BusPark" if $read;
+
+    $result[0] = "Read" if $read;
+
+    for ( 0 .. $bytes ) {
+        push @result,
+          qw (Data7 Data6 Data5 Data4 Data3 Data2 Data1 Data0 ParityData);
+    }
+
+    # add bus park
+    push @result, "BusPark";
+
+    # add comment for stop cycle after bus park
+    push @result, "";
+
+    return @result;
+}
+
+=head2 commentArrayLong
+
+ return comment array for long mode, $bytes starts from 0.
+
+=cut
+
+fun commentArrayLong (Int $read=0, Int $bytes=0)
+{
+    my @result = qw(
+      Write SSC SSC
+      SlaveAddr3 SlaveAddr2 SlaveAddr1 SlaveAddr0
+      Command4 Command3 Command2 Command1 Command0
+      ByteCount2 ByteCount1 ByteCount0
+      ParityCmd
+      DataAddr15 DataAddr14 DataAddr13 DataAddr12
+      DataAddr11 DataAddr10 DataAddr9 DataAddr8
+      ParityAddr
+      DataAddr7 DataAddr6 DataAddr5 DataAddr4
+      DataAddr3 DataAddr2 DataAddr1 DataAddr0
+      ParityAddr
+      );
 
     push @result, "BusPark" if $read;
 
@@ -1109,6 +1208,22 @@ fun isExtended ( Str $reg )
     return 0;
 }
 
+=head2 isLong
+
+ return true if register requires long mode.
+
+=cut
+
+fun isLong ( Str $reg )
+{
+    return 0 if $reg eq "nop";
+
+    my $addr = hex( &getRegAddr($reg) );
+    return 1 if $addr > 0xFF and $addr <= 0xffff;
+
+    return 0;
+}
+
 =head2 isReg0WriteMode
 
  return true if register can be written with register 0 write mode.
@@ -1130,6 +1245,7 @@ fun isReg0WriteMode (Str $reg)
  return MIPI mode for current register of current dut.
  "reg0"     : register 0 write mode
  "extended" : extended mode
+ "long"     : long mode
  ""         : register read/write mode
 
 =cut
@@ -1137,6 +1253,9 @@ fun isReg0WriteMode (Str $reg)
 fun getMipiMode (ArrayRef $regref, Int $dut, Int :$reg0)
 {
     return "reg0" if $reg0 and isReg0WriteMode( $regref->[$dut] );
+
+    my $long = grep &isLong($_), @$regref;
+    return "long" if $long;
 
     my $extended = grep &isExtended($_), @$regref;
     return "extended" if $extended;
@@ -1170,7 +1289,7 @@ fun getSlaveAddr (Str $reg)
 {
     return "" if $reg eq "nop";
 
-    if ( $reg =~ /0x([[:xdigit:]])/x ) {
+    if ( $reg =~ /0x([[:xdigit:]])/i ) {
         return lc $1;
     } else {
         die "invalid slave address for $reg";
@@ -1187,7 +1306,12 @@ fun getRegAddr (Str $reg)
 {
     return "" if $reg eq "nop";
 
-    if ( $reg =~ /0x[[:xdigit:]] ([[:xdigit:]]{2,2}) :?(:?[[:xdigit:]]{2,2})/x )
+    if ( $reg =~
+        /0x[[:xdigit:]] ( [[:xdigit:]]{4,4} ) :? (:? [[:xdigit:]]{2,2})/xi )
+    {
+        return lc $1;
+    } elsif ( $reg =~
+        /0x[[:xdigit:]] ( [[:xdigit:]]{2,2} ) :? (:?[[:xdigit:]]{2,2})/xi )
     {
         return lc $1;
     } else {
@@ -1205,13 +1329,15 @@ fun getRegData (Str $reg)
 {
     return "" if $reg eq "nop";
 
-    if ( $reg =~ /0x[[:xdigit:]]{3,3} ([[:xdigit:]]{2,2}) $/x ) {
-        return ($1);
-    } elsif ( $reg =~ /0x[[:xdigit:]]{3,3}:( (:? -?[[:xdigit:]]{2,2})+ ) /x ) {
-        return split '-', $1;
-    } else {
-        die "invalid register data for $reg";
+    if ( $reg =~ /:/ ) {
+        my @tmp = split /:/, $reg;
+        $reg = $tmp[-1];
+        return split /-/, $reg;
+    } elsif ( $reg =~ /[[:xdigit:]]{5,5} (:? [[:xdigit:]]{2,2} )?/x ) {
+        return substr $reg, -2;
     }
+
+    die "invalid register data for $reg";
 }
 
 =head2 getBits
