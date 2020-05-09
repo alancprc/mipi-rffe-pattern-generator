@@ -725,12 +725,14 @@ method writeVectors (ArrayRef $ref)
                 "jump" );
         } elsif (/^\s*trig/i) {
             $self->printTriggerVector();
-        } elsif (/^\s*(R:|0:|0:00)?\s*(\w+\s*(?:,\s*\w+)*.*)$/) {    # read/write
-            my ( $read, $reg0 ) = ( 0, 0 );
-            $read = 1 if $1 and $1 eq "R:";
-            $reg0 = 1 if $1 and $1 eq "0:";
+        } elsif (/^\s*(R:|0:(?:00)?)?\s*(\w+\s*(?:,\s*\w+)*.*)$/) { # read/write
+
+            # ms excel will turn '0:' to '0:00'
+            my ( $read, $reg0, $mode, $ins ) = ( 0, 0, $1, $2 );
+            $read = 1 if $mode and $mode =~ /R:/i;
+            $reg0 = 1 if $mode and $mode =~ /0:/;
             $self->writeSingleInstruction(
-                $2,
+                $ins,
                 read => $read,
                 reg0 => $reg0
             );
