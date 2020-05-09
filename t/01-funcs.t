@@ -32,6 +32,40 @@ isa_ok( $mipi, "MipiPatternGenerator" );
     is( MipiPatternGenerator::oddParity(@data), 0 );
 }
 
+# get slave addr
+is( &MipiPatternGenerator::getSlaveAddr("0xE2F1C"),  "e", "slave addr" );
+is( &MipiPatternGenerator::getSlaveAddr("0XE2F1C"),  "e", "slave addr" );
+
+# get register addr
+is( &MipiPatternGenerator::getRegAddr("0XE2F1C"),  "2f", "reg addr" );
+is( &MipiPatternGenerator::getRegAddr("0xE1C1C"),  "1c", "reg addr" );
+is( &MipiPatternGenerator::getRegAddr("0xE001C"),  "00", "reg addr" );
+is( &MipiPatternGenerator::getRegAddr("0xE1C:11-22"),  "1c", "reg addr" );
+is( &MipiPatternGenerator::getRegAddr("0xE1C1C:11-22"), "1c1c", "reg addr" );
+
+# get register data
+my @data = &MipiPatternGenerator::getRegData("0XE1C38");
+is( join( "", @data ), "38", "reg data" );
+@data = &MipiPatternGenerator::getRegData("0xE1C:38");
+is( join( "", @data ), "38", "reg data" );
+@data = &MipiPatternGenerator::getRegData("0xE1C1C38");
+is( join( "", @data ), "38", "reg data" );
+@data = &MipiPatternGenerator::getRegData("0xE1C1C:38");
+is( join( "", @data ), "38", "reg data" );
+@data = &MipiPatternGenerator::getRegData("0xE1C1C:11-22");
+is( join( "", @data ), "1122", "reg data" );
+
+# isExtended
+is( &MipiPatternGenerator::isExtended("0xE2C38"),  1, "extended mode" );
+is( &MipiPatternGenerator::isExtended("0xE1C38"),  0, "extended mode" );
+is( &MipiPatternGenerator::isExtended("0xE1C:38"), 0, "extended mode" );
+
+# isLong
+is( &MipiPatternGenerator::isLong("0xE2C38"),  0, "long mode" );
+is( &MipiPatternGenerator::isLong("0xE1C:38"), 0, "long mode" );
+is( &MipiPatternGenerator::isLong("0xE1C1C:38"),  1, "long mode" );
+is( &MipiPatternGenerator::isLong("0xE1C1C:11-22-33"),  1, "long mode" );
+
 # get data
 {
     my @data = MipiPatternGenerator::getDataArray( "0xE1C38", 0 );
