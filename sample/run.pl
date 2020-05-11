@@ -19,16 +19,18 @@ NAME
     $prog - generate mipi pattern for Unison
 
 USAGE
-    $prog [pseudo-pattern-file] [pseudo-pattern-file...]
+    $prog [config-file] [config-file...]
 
 DESCRIPTION
-    Generate pattern from pseudo pattern file and register table file.
+    Generate pattern from config files, with or without register table files.
     Multiple devices are Supported.
     The following mipi mode are supported:
         Register Write
         Register Read
         Extended Register Write
         Extended Register Read
+        Extended Long Register Write
+        Extended Long Register Read
         Register 0 Write
 
 Supported Unison pattern micro-instructions:
@@ -42,8 +44,12 @@ Supported Pseudo instructions:
     nop     -   no operation for specific dut, clock/data stays all zero
 
 EXAMPLE
-    Refer to sample.txt, sample.uno and regtable_dut1.csv which should come
-    along this tool.
+    The following sample files should come along this tool:
+        sample.cfg              config file in .cfg format
+        sample.csv              config file in .csv file
+        regtable_dut1.csv       register table for device 1
+        regtable_dut2.csv       register table for device 2
+        sample.uno              pattern source generated from sample.cfg/csv
 
 EOF
 
