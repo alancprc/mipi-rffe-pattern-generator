@@ -50,7 +50,7 @@ close $fh;
     is( join( "", @data ), $exp, "long write data bits" );
 
     @data = MipiPatternGenerator::getDataArray( "0xE2C47", 1, "long" );
-    $exp  = "01011100011100010000000010010110000LHLLLHHHH00";
+    $exp  = "01011100011100010000000010010110000LHLLLHHHHX0";
     is( join( "", @data ), $exp, "long read data bits" );
 }
 

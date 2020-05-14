@@ -73,7 +73,7 @@ is( &MipiPatternGenerator::isLong("0xE1C1C:11-22-33"),  1, "long mode" );
     is( join( "", @data ), $exp, "write data bits");
 
     @data = MipiPatternGenerator::getDataArray( "0xE1C40", 1 );
-    $exp = "01011100111110010LHLLLLLLL00";
+    $exp = "01011100111110010LHLLLLLLLX0";
     is( join( "", @data ), $exp, "read data bits" );
 }
 
@@ -100,7 +100,7 @@ is( &MipiPatternGenerator::isLong("0xE1C1C:11-22-33"),  1, "long mode" );
 
     @data = MipiPatternGenerator::getDataArray( "0xE1C40", 1 );
     my @read = $mipi->getTimeSetArray(@data);
-    is ( join("", @read), "W" x 17 . "r" x 9 . "WW", "read time set");
+    is ( join("", @read), "W" x 17 . "r" x 10 . "W", "read time set");
 }
 
 # get comment

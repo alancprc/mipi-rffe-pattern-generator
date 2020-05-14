@@ -57,7 +57,7 @@ is( &MipiPatternGenerator::isExtended("0xE1C:38"), 0, "extended mode check" );
     is( join( "", @data ), $exp, "extended write data bits" );
 
     @data = MipiPatternGenerator::getDataArray( "0xE2C47", 1, "extended" );
-    $exp  = "01011100010000010010110000LHLLLHHHH00";
+    $exp  = "01011100010000010010110000LHLLLHHHHX0";
     is( join( "", @data ), $exp, "extended read data bits" );
 }
 
@@ -83,7 +83,7 @@ is( &MipiPatternGenerator::isExtended("0xE1C:38"), 0, "extended mode check" );
 
     @data = MipiPatternGenerator::getDataArray( "0xE2C47", 1, "extended" );
     my @read = $mipi->getTimeSetArray(@data);
-    is( join( "", @read ), "W" x 26 . "r" x 9 . "WW",
+    is( join( "", @read ), "W" x 26 . "r" x 10 . "W",
         "extended read time set" );
 }
 
@@ -159,7 +159,7 @@ is( &MipiPatternGenerator::isExtended("0xE1C:38"), 0, "extended mode check" );
 
     @data =
       MipiPatternGenerator::getDataArray( "0xE2C:47-1B-2B-3B", 1, "extended" );
-    $exp = "01011100010001110010110000LHLLLHHHHLLLHHLHHHLLHLHLHHHLLHHHLHHL00";
+    $exp = "01011100010001110010110000LHLLLHHHHLLLHHLHHHLLHLHLHHHLLHHHLHHLX0";
     is( join( "", @data ), $exp, "extended read data bits" );
 }
 
@@ -191,7 +191,7 @@ is( &MipiPatternGenerator::isExtended("0xE1C:38"), 0, "extended mode check" );
     my @read = $mipi->getTimeSetArray(@data);
     is(
         join( "", @read ),
-        "W" x 26 . "r" x 36 . "WW",
+        "W" x 26 . "r" x 37 . "W",
         "extended read time set"
     );
 }

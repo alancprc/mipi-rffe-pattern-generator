@@ -196,7 +196,8 @@ method getTimeSetArray (@data)
         "0" => $self->{'tsetWrite'},
         "1" => $self->{'tsetWrite'},
         "H" => $self->{'tsetRead'},
-        "L" => $self->{'tsetRead'}
+        "L" => $self->{'tsetRead'},
+        "X" => $self->{'tsetRead'}
     );
     my @result = map { $tset{$_} } @data;
     return @result;
@@ -309,7 +310,7 @@ fun getDataArrayExtended (Str $reg, Int $read)
     }
 
     # add bus park
-    push @result, 0;
+    push @result, $read ? "X" : "0";
 
     # add extra idle after bus park
     push @result, 0;
@@ -364,7 +365,7 @@ fun getDataArrayLong (Str $reg, Int $read)
     }
 
     # add bus park
-    push @result, 0;
+    push @result, $read ? "X" : "0";
 
     # add extra idle after bus park
     push @result, 0;
@@ -421,7 +422,7 @@ fun getDataArray (Str $reg, Int $read, Str $mode="")
     &replace01withLH( \@result, -9, 9 ) if $read;
 
     # add bus park
-    push @result, 0;
+    push @result, $read ? "X" : "0";
 
     # add extra idle after bus park
     push @result, 0;
