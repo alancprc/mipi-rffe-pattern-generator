@@ -714,6 +714,11 @@ method writeVectors (ArrayRef $ref)
     for (@$ref) {
         if (/^Label:\s*(\w+)/) {    # label
             $self->printUno("\$$1");
+        } elsif (/^\s*wait\s*(gf)/i) {
+            $self->printDataInsComment( $self->getIdleVectorData, "<COND !GF>",
+                "wait for GF" );
+            $self->printDataInsComment( $self->getIdleVectorData, "<CJMP .>",
+                "wait for GF" );
         } elsif (/^\s*wait\s*(\d+)*/i) {
             my $ins = $1 ? "<RPT $1>" : "";
             $self->printDataInsComment( $self->getIdleVectorData, $ins,

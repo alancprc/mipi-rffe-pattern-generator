@@ -10,6 +10,7 @@ t/20-extended-mode.t
 t/30-reg0-write.t
 t/40-mixed.t
 t/50-long.t
+t/60-wait-gf.t
 t/manifest.t
 t/pod-coverage.t
 t/pod.t

@@ -7,6 +7,8 @@ Type Generic;
 PinList = "CLK_pin+DATA_pin+CLK2_pin+DATA2_pin+FX_TRIGGER_pin+VRAMP_pin+dummy_pin";
 
 $Leak_LB_HPM
+*0000001* TS26MHz; <COND !GF>         "wait for GF"
+*0000001* TS26MHz; <CJMP .>           "wait for GF"
 *0000001* TS26MHz;                    "Write 1:0xE1C38 2:nop"
 *0100001* TS26MHz;                    "SSC, "
 *0000001* TS26MHz;                    "SSC, "
