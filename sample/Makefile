@@ -2,7 +2,7 @@ DATE=$(shell date +%Y%m%d)
 TARGET=mipiPatternGenerator_${DATE}
 TARBALL=${TARGET}.tar.gz
 PM=MipiPatternGenerator.pm
-RELEASE=/net/shfs1/vol/apps/apps/Private/alan/sharing/mipiPatternGenerator
+RELEASE=/net/shfs1/vol/training/training/PAx/Tools/mipiPatternGenerator
 
 all : ${TARGET} ${TARBALL}
 
