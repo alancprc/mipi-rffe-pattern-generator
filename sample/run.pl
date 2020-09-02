@@ -9,9 +9,6 @@ use lib $RealBin;
 
 use MipiPatternGenerator;
 
-# generate
-my $mipi = MipiPatternGenerator->new();
-
 my $prog = $0;
 
 my $help =<<EOF;
@@ -56,5 +53,6 @@ EOF
 die $help unless @ARGV;
 
 for my $file (@ARGV) {
+    my $mipi = MipiPatternGenerator->new();
     $mipi->gen("$file");
 }
