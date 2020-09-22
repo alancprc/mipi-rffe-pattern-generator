@@ -1062,13 +1062,16 @@ method readRegisterTable (ArrayRef $ref)
             my @data = split /,/;
             my $name = shift @data;
 
+            my @addrdata;
             # concate address and data;
             for my $i ( 0 .. $#data ) {
                 my $data = $data[$i];
+                next unless $data;
+
                 $data =~ s/0x//i;
-                $data[$i] = $addr[$i] . $data;
+                push @addrdata, $addr[$i] . $data;
             }
-            $self->{'table'}->[$dut]->{$name} = \@data;
+            $self->{'table'}->[$dut]->{$name} = \@addrdata;
         }
     }
 }
